@@ -1,6 +1,6 @@
 // Brew Log service worker — offline-first app shell.
 // DEPLOYMENT RULE: bump CACHE on every change so installed copies refresh.
-const CACHE = 'brewlog-v12';
+const CACHE = 'brewlog-v13';
 
 const SHELL = [
   '/',
@@ -51,23 +51,23 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Same-origin: cache-first, network fallback, index fallback for navigations.
-  if (url.origin === self.location.origin) {
-    event.respondWith(
-      caches.match(req).then((hit) => {
-        if (hit) return hit;
-        return fetch(req)
-          .then((res) => {
-            if (res.ok && !res.redirected) {
-              const copy = res.clone();
-              caches.open(CACHE).then((c) => c.put(req, copy));
-            }
-            return res;
-          })
-          .catch(() => {
-            if (req.mode === 'navigate') return caches.match('/index.html');
-            return Response.error();
+if (url.origin === self.location.origin) {
+  event.respondWith(
+    fetch(req)
+      .then((res) => {
+        // Never cache redirects
+        if (res.ok && !res.redirected) {
+          caches.open(CACHE).then((cache) => {
+            cache.put(req, res.clone());
           });
+        }
+        return res;
       })
-    );
-  }
-});
+      .catch(() => {
+        if (req.mode === 'navigate') {
+          return caches.match('/index.html');
+        }
+        return Response.error();
+      })
+  );
+}
