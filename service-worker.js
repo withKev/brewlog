@@ -1,16 +1,16 @@
 // Brew Log service worker — offline-first app shell.
 // DEPLOYMENT RULE: bump CACHE on every change so installed copies refresh.
-const CACHE = 'brewlog-v10';
+const CACHE = 'brewlog-v13';
 
 const SHELL = [
-  './',
-  './index.html',
-  './manifest.json',
-  './icon-180.png',
-  './icon-192.png',
-  './icon-512.png',
-  './icon-512-maskable.png',
-  './favicon.png'
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/icon-180.png',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/icon-512-maskable.png',
+  '/favicon.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -50,22 +50,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+
   // Same-origin: cache-first, network fallback, index fallback for navigations.
   if (url.origin === self.location.origin) {
     event.respondWith(
-      caches.match(req).then((hit) => {
-        if (hit) return hit;
-        return fetch(req)
-          .then((res) => {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy));
-            return res;
-          })
-          .catch(() => {
-            if (req.mode === 'navigate') return caches.match('./index.html');
-            return Response.error();
-          });
-      })
+      fetch(req)
+        .then((res) => {
+          // Never cache redirects
+          if (res.ok && !res.redirected) {
+            caches.open(CACHE).then((cache) => {
+              cache.put(req, res.clone());
+            });
+          }
+          return res;
+        })
+        .catch(() => {
+          if (req.mode === 'navigate') {
+            return caches.match('/index.html');
+          }
+          return Response.error();
+        })
     );
   }
 });
