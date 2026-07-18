@@ -1,0 +1,20 @@
+name = "brewlog-sync"
+main = "src/index.js"
+compatibility_date = "2026-07-01"
+
+# --- Bindings (create these once with the CLI steps in README.md) ---
+[[d1_databases]]
+binding = "DB"
+database_name = "brewlog"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "brewlog-photos"
+
+[vars]
+# Lock CORS to your Pages site. Change if you use a custom domain.
+ALLOWED_ORIGIN = "https://REPLACE_WITH_YOUR_PROJECT.pages.dev"
+
+# The SYNC_KEY secret is NOT set here (never commit secrets):
+#   wrangler secret put SYNC_KEY

@@ -1,0 +1,9 @@
+# Keep the app shell fresh so updates always propagate; never serve a stale page or worker.
+/
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+/service-worker.js
+  Cache-Control: no-cache
+/manifest.json
+  Cache-Control: no-cache

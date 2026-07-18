@@ -1,0 +1,2004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<title>Brew Log</title>
+<meta name="description" content="A quiet, offline log for your coffee and matcha brews." />
+
+<!-- PWA / iOS home-screen -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" id="tcLight" media="(prefers-color-scheme: light)" content="#FBF9F5" />
+<meta name="theme-color" id="tcDark" media="(prefers-color-scheme: dark)" content="#171310" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Brew Log" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<link rel="icon" href="favicon.png" />
+
+<!-- Display serif for the wordmark; UI uses the native system font -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet" />
+
+<style>
+  :root {
+    --paper:#FBF9F5; --card:#FFFFFF; --ink:#241C17; --muted:#8A7F76;
+    --line:#EAE3DA; --line-2:#F1EBE2; --seg:#F2ECE3;
+    --coffee:#9A5B34; --matcha:#5C8A3F; --danger:#B23B3B;
+    --accent:var(--coffee); --accent-tint:rgba(154,91,52,.10);
+    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+    --serif:"Fraunces",Georgia,"Times New Roman",serif;
+    --topinset:env(safe-area-inset-top,0px);
+    --botinset:env(safe-area-inset-bottom,0px);
+    --sideinset:env(safe-area-inset-left,0px);
+    --shadow:0 1px 2px rgba(36,28,23,.05),0 6px 20px rgba(36,28,23,.06);
+    --scrim:rgba(36,28,23,.34);
+  }
+  [data-theme="dark"] {
+    --paper:#171310; --card:#211B16; --ink:#F0E9E1; --muted:#9C9088;
+    --line:#332B24; --line-2:#2A231D; --seg:#26201A;
+    --coffee:#C6875A; --matcha:#8CB46A; --danger:#D96A6A;
+    --shadow:0 1px 2px rgba(0,0,0,.25),0 6px 20px rgba(0,0,0,.28);
+    --scrim:rgba(0,0,0,.5);
+  }
+  [data-drink="coffee"]{ --accent:var(--coffee); --accent-tint:rgba(154,91,52,.12); }
+  [data-drink="matcha"]{ --accent:var(--matcha); --accent-tint:rgba(92,138,63,.12); }
+  [data-theme="dark"][data-drink="coffee"]{ --accent-tint:rgba(198,135,90,.16); }
+  [data-theme="dark"][data-drink="matcha"]{ --accent-tint:rgba(140,180,106,.16); }
+
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; padding:0; background:var(--paper); }
+  body {
+    font-family:var(--sans); color:var(--ink); background:var(--paper);
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    overscroll-behavior-y:none; transition:background .25s ease, color .25s ease;
+  }
+  button { font-family:inherit; color:inherit; cursor:pointer; border:none; background:none; font-size:inherit; }
+  input,textarea,select { font-family:inherit; font-size:16px; color:var(--ink); }
+
+  .app { max-width:520px; margin:0 auto; min-height:100vh;
+         padding-left:max(var(--sideinset),0px); padding-right:max(var(--sideinset),0px); }
+
+  header {
+    position:sticky; top:0; z-index:20; background:color-mix(in srgb, var(--paper) 86%, transparent);
+    backdrop-filter:saturate(1.4) blur(12px); -webkit-backdrop-filter:saturate(1.4) blur(12px);
+    padding-top:calc(var(--topinset) + 10px);
+    border-bottom:1px solid var(--line-2);
+  }
+  @supports not (background:color-mix(in srgb, red 50%, blue)) {
+    header { background:var(--paper); }
+  }
+  .bar { display:flex; align-items:center; justify-content:space-between; padding:0 18px 10px; }
+  .wordmark { display:flex; align-items:baseline; gap:8px; }
+  .wordmark b { font-family:var(--serif); font-weight:600; font-size:24px; letter-spacing:-.01em; }
+  .wordmark .dot { width:9px; height:9px; border-radius:50%; background:var(--accent); transition:background .35s ease; transform:translateY(-2px); }
+  .icon-btn { width:40px; height:40px; border-radius:12px; display:grid; place-items:center; color:var(--muted); }
+  .icon-btn:active { background:var(--line-2); }
+
+  .segment { display:flex; gap:4px; margin:0 18px 8px; padding:4px; background:var(--seg); border-radius:14px; }
+  .segment button { flex:1; padding:9px 0; border-radius:10px; font-size:15px; font-weight:600; color:var(--muted); letter-spacing:-.01em; }
+  .segment button.on { background:var(--card); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.10); }
+  .s-swatch { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:6px; opacity:.4; vertical-align:middle; transform:translateY(-1px); }
+  .segment button.on .s-swatch { opacity:1; }
+  .s-coffee { background:var(--coffee); } .s-matcha { background:var(--matcha); }
+
+  .subtabs { display:flex; gap:18px; padding:2px 22px 10px; }
+  .subtabs button { font-size:14.5px; font-weight:600; color:var(--muted); padding:4px 2px; border-bottom:2px solid transparent; }
+  .subtabs button.on { color:var(--ink); border-bottom-color:var(--accent); }
+
+  .summary { display:flex; gap:22px; padding:14px 20px 2px; }
+  .summary div { display:flex; flex-direction:column; }
+  .summary .n { font-family:var(--serif); font-weight:600; font-size:22px; line-height:1; font-variant-numeric:tabular-nums; }
+  .summary .l { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-top:5px; }
+
+  main { padding:6px 16px calc(120px + var(--botinset)); }
+  .day-label { font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:20px 4px 8px; }
+
+  /* backup nudge */
+  .nudge { display:flex; align-items:center; gap:12px; background:var(--accent-tint); border:1px solid var(--line);
+           border-radius:14px; padding:12px 14px; margin:14px 2px 4px; }
+  .nudge p { flex:1; margin:0; font-size:13.5px; line-height:1.4; color:var(--ink); }
+  .nudge .go { color:var(--accent); font-weight:600; font-size:14px; padding:6px 8px; }
+  .nudge .later { color:var(--muted); font-size:14px; padding:6px 8px; }
+
+  /* cards */
+  .brew, .lib {
+    background:var(--card); border:1px solid var(--line); border-radius:18px;
+    padding:14px 16px; margin-bottom:10px; box-shadow:var(--shadow);
+    display:block; width:100%; text-align:left; transition:transform .08s ease;
+  }
+  .brew:active, .lib:active { transform:scale(.99); }
+  .brew-top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+  .brew-name { font-family:var(--serif); font-size:18px; font-weight:600; letter-spacing:-.01em; line-height:1.2; }
+  .brew-sub { font-size:13px; color:var(--muted); margin-top:2px; }
+  .accent-line { width:3px; align-self:stretch; border-radius:3px; background:var(--accent); }
+  .brew-row { display:flex; gap:12px; }
+  .pips { display:flex; gap:4px; flex-shrink:0; margin-top:3px; }
+  .pip { width:9px; height:9px; border-radius:50%; background:var(--line); }
+  .pip.f { background:var(--accent); }
+  .stats { display:flex; flex-wrap:wrap; gap:6px 8px; margin-top:12px; }
+  .chip { font-size:12.5px; color:var(--ink); background:var(--paper); border:1px solid var(--line);
+          padding:4px 9px; border-radius:8px; font-variant-numeric:tabular-nums; }
+  .chip b { color:var(--muted); font-weight:600; margin-right:4px; }
+  .chip.ratio { background:var(--accent-tint); border-color:transparent; color:var(--accent); font-weight:600; }
+  .brew-notes { font-size:13.5px; color:var(--muted); margin-top:10px; line-height:1.45; }
+
+  /* library cards */
+  .lib { display:flex; gap:14px; align-items:center; }
+  .lib .thumb { width:58px; height:58px; border-radius:12px; background:var(--seg); flex-shrink:0;
+                display:grid; place-items:center; font-size:24px; overflow:hidden; }
+  .lib .thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .lib .lb { flex:1; min-width:0; }
+  .lib .lb .nm { font-family:var(--serif); font-size:17px; font-weight:600; line-height:1.2;
+                 white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .lib .lb .sb { font-size:13px; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .lib .pr { font-size:14px; font-weight:600; color:var(--accent); font-variant-numeric:tabular-nums; flex-shrink:0; }
+
+  .empty { text-align:center; padding:64px 30px; color:var(--muted); }
+  .empty .cup { font-size:40px; margin-bottom:14px; opacity:.55; }
+  .empty h2 { font-family:var(--serif); font-weight:600; color:var(--ink); font-size:20px; margin:0 0 6px; }
+  .empty p { font-size:14px; line-height:1.5; margin:0; }
+
+  .fab {
+    position:fixed; left:50%; transform:translateX(-50%);
+    bottom:calc(20px + var(--botinset)); z-index:30;
+    background:var(--accent); color:#fff; font-weight:600; font-size:16px; letter-spacing:-.01em;
+    padding:15px 26px; border-radius:999px; display:flex; align-items:center; gap:9px;
+    box-shadow:0 6px 22px rgba(0,0,0,.25); transition:background .35s ease, transform .08s ease;
+  }
+  .fab:active { transform:translateX(-50%) scale(.96); }
+  .fab svg { width:19px; height:19px; }
+
+  /* sheets */
+  .scrim { position:fixed; inset:0; background:var(--scrim); z-index:40; opacity:0; pointer-events:none; transition:opacity .28s ease; }
+  .scrim.show { opacity:1; pointer-events:auto; }
+  .sheet {
+    position:fixed; left:0; right:0; bottom:0; z-index:50; max-width:520px; margin:0 auto;
+    background:var(--paper); border-radius:22px 22px 0 0; box-shadow:0 -8px 40px rgba(0,0,0,.3);
+    transform:translateY(100%); transition:transform .32s cubic-bezier(.32,.72,0,1);
+    max-height:94vh; display:flex; flex-direction:column;
+    padding-left:max(var(--sideinset),0px); padding-right:max(var(--sideinset),0px);
+  }
+  .sheet.show { transform:translateY(0); }
+  .grip { width:38px; height:5px; border-radius:3px; background:var(--line); margin:10px auto 4px; flex-shrink:0; }
+  .sheet-head { display:flex; align-items:center; justify-content:space-between; padding:6px 18px 10px; }
+  .sheet-head h2 { font-family:var(--serif); font-weight:600; font-size:20px; margin:0; }
+  .sheet-body { overflow-y:auto; -webkit-overflow-scrolling:touch; padding:4px 18px 18px; }
+  .txt-btn { font-size:16px; color:var(--accent); font-weight:600; padding:6px 4px; }
+  .txt-btn.mute { color:var(--muted); font-weight:500; }
+
+  .field { margin-bottom:14px; }
+  .field label { display:block; font-size:12px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin:0 0 6px 2px; }
+  .field input[type="text"], .field input[type="number"], .field textarea, .field select {
+    width:100%; background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:13px 14px; font-size:16px; outline:none; transition:border-color .15s, box-shadow .15s;
+    -webkit-appearance:none; appearance:none;
+  }
+  .field select { background-image:linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+                  background-position:calc(100% - 20px) 50%, calc(100% - 15px) 50%; background-size:5px 5px; background-repeat:no-repeat; padding-right:38px; }
+  .field input:focus, .field textarea:focus, .field select:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-tint); }
+  .field textarea { min-height:80px; resize:vertical; line-height:1.45; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .ratio-input { display:flex; align-items:center; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:0 14px; transition:border-color .15s, box-shadow .15s; }
+  .ratio-input:focus-within { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-tint); }
+  .ratio-input .rp { color:var(--muted); font-size:16px; font-variant-numeric:tabular-nums; }
+  .field .ratio-input input[type="text"] { flex:1; width:auto; border:none; background:transparent; padding:13px 4px; box-shadow:none; border-radius:0; }
+  .field .ratio-input input[type="text"]:focus { border:none; box-shadow:none; }
+  .with-suffix { position:relative; }
+  .with-suffix .suffix { position:absolute; right:13px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:14px; pointer-events:none; }
+  .with-suffix input { padding-right:44px; }
+
+  .chips-row { display:flex; flex-wrap:wrap; gap:8px; }
+  .chips-row button { font-size:14px; font-weight:600; color:var(--muted); background:var(--card);
+                      border:1px solid var(--line); border-radius:999px; padding:9px 15px; }
+  .chips-row button.on { color:#fff; background:var(--accent); border-color:var(--accent); }
+
+  .seg-mini { display:flex; gap:4px; padding:4px; background:var(--seg); border-radius:12px; }
+  .seg-mini button { flex:1; padding:9px 0; border-radius:9px; font-size:14.5px; font-weight:600; color:var(--muted); }
+  .seg-mini button.on { background:var(--card); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.10); }
+
+  .ratio-readout { text-align:center; font-size:13px; color:var(--muted); margin:2px 0 14px; font-variant-numeric:tabular-nums; }
+  .ratio-readout b { font-family:var(--serif); color:var(--accent); font-size:16px; margin-left:4px; }
+  .ratio-hint { display:block; margin:6px auto 0; font-size:13px; color:var(--accent); font-weight:600; }
+
+  .rate-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .rate-pips { display:flex; gap:10px; }
+  .rate-pips button { width:30px; height:30px; border-radius:50%; border:1.5px solid var(--line); background:var(--card); transition:.12s; }
+  .rate-pips button.f { background:var(--accent); border-color:var(--accent); }
+
+  .switch-row { display:flex; align-items:center; justify-content:space-between; background:var(--card);
+                border:1px solid var(--line); border-radius:12px; padding:12px 14px; }
+  .switch-row span { font-size:15.5px; }
+  .sw { position:relative; width:50px; height:30px; border-radius:16px; background:var(--seg); transition:.2s; border:1px solid var(--line); }
+  .sw::after { content:""; position:absolute; top:2px; left:2px; width:24px; height:24px; border-radius:50%;
+               background:var(--card); box-shadow:0 1px 3px rgba(0,0,0,.25); transition:.2s; }
+  .sw.on { background:var(--accent); border-color:var(--accent); }
+  .sw.on::after { left:22px; background:#fff; }
+
+  details.more { border:1px solid var(--line); border-radius:12px; background:var(--card); margin-bottom:14px; }
+  details.more summary { list-style:none; padding:13px 14px; font-size:14.5px; font-weight:600; color:var(--muted); cursor:pointer; }
+  details.more summary::-webkit-details-marker { display:none; }
+  details.more summary::after { content:"›"; float:right; transform:rotate(90deg); transition:.15s; color:var(--muted); }
+  details.more[open] summary::after { transform:rotate(-90deg); }
+  details.more .inner { padding:0 14px 6px; }
+
+  .photo-box { display:flex; gap:14px; align-items:center; }
+  .photo-box .pv { width:76px; height:76px; border-radius:14px; background:var(--seg); overflow:hidden;
+                   display:grid; place-items:center; font-size:26px; flex-shrink:0; }
+  .photo-box .pv img { width:100%; height:100%; object-fit:cover; display:block; }
+  .photo-box .pb { display:flex; flex-direction:column; gap:8px; }
+  .photo-box .pb button { text-align:left; font-size:14.5px; font-weight:600; color:var(--accent); padding:4px 2px; }
+  .photo-box .pb button.rm { color:var(--danger); }
+
+  .save-bar { position:sticky; bottom:0; background:linear-gradient(to top,var(--paper) 72%,transparent);
+              padding:12px 18px calc(14px + var(--botinset)); display:flex; gap:10px; }
+  .btn-primary { flex:1; background:var(--accent); color:#fff; font-weight:600; font-size:16.5px; padding:15px; border-radius:14px; transition:background .35s ease, transform .08s; }
+  .btn-primary:active { transform:scale(.98); }
+  .btn-ghost { padding:15px 18px; border-radius:14px; color:var(--danger); font-weight:600; font-size:15px; }
+
+  .set-group { background:var(--card); border:1px solid var(--line); border-radius:16px; overflow:hidden; margin-bottom:16px; }
+  .set-row { display:flex; align-items:center; justify-content:space-between; padding:15px 16px; width:100%; text-align:left; font-size:16px; border-bottom:1px solid var(--line-2); gap:10px; }
+  .set-row:last-child { border-bottom:none; }
+  .set-row .desc { font-size:12.5px; color:var(--muted); margin-top:3px; }
+  .set-row .chev { color:var(--muted); }
+  .toggle-pills { display:flex; gap:4px; padding:3px; background:var(--seg); border-radius:10px; flex-shrink:0; }
+  .toggle-pills button { padding:7px 12px; border-radius:8px; font-size:13.5px; font-weight:600; color:var(--muted); }
+  .toggle-pills button.on { background:var(--card); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.10); }
+  .set-note { font-size:12.5px; color:var(--muted); line-height:1.5; padding:0 6px 8px; }
+  .paste-area { width:100%; min-height:120px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; font-size:14px; font-family:ui-monospace,Menlo,monospace; color:var(--ink); }
+  .grinder-row { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--line-2); font-size:15.5px; }
+  .grinder-row:last-child { border-bottom:none; }
+  .grinder-row .del { color:var(--danger); font-size:14px; font-weight:600; padding:4px 6px; }
+
+  .toast { position:fixed; left:50%; bottom:calc(96px + var(--botinset)); transform:translateX(-50%) translateY(20px);
+           background:var(--ink); color:var(--paper); font-size:14px; font-weight:500; padding:11px 18px; border-radius:12px;
+           z-index:60; opacity:0; pointer-events:none; transition:.25s; max-width:88%; text-align:center; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  /* in-app confirm/prompt (replaces native dialogs, which iOS PWAs suppress) */
+  .dlg-back { position:fixed; inset:0; z-index:70; display:grid; place-items:center; padding:24px;
+              background:var(--scrim); opacity:0; pointer-events:none; transition:opacity .2s ease;
+              padding-bottom:calc(24px + var(--botinset)); }
+  .dlg-back.show { opacity:1; pointer-events:auto; }
+  .dlg { background:var(--paper); border-radius:20px; width:100%; max-width:340px; padding:20px 20px 18px;
+         box-shadow:0 20px 60px rgba(0,0,0,.4); transform:scale(.95); transition:transform .2s ease; }
+  .dlg-back.show .dlg { transform:scale(1); }
+  .dlg-title { font-family:var(--serif); font-weight:600; font-size:18px; line-height:1.25; }
+  .dlg-msg { font-size:14px; color:var(--muted); line-height:1.45; margin-top:6px; }
+  .dlg-input { width:100%; background:var(--card); border:1px solid var(--line); border-radius:12px;
+               padding:12px 14px; font-size:16px; margin-top:14px; outline:none; }
+  .dlg-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-tint); }
+  .dlg-actions { display:flex; gap:10px; margin-top:18px; }
+  .dlg-btn { flex:1; padding:13px; border-radius:12px; font-size:15.5px; font-weight:600; }
+  .dlg-btn.cancel { background:var(--seg); color:var(--ink); }
+  .dlg-btn.primary { background:var(--accent); color:#fff; }
+  .dlg-btn.danger { background:var(--danger); color:#fff; }
+  @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="bar">
+      <div class="wordmark"><b>Brew Log</b><span class="dot"></span></div>
+      <button class="icon-btn" id="settingsBtn" aria-label="Settings">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 7a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 9 2.6h.1A1.7 1.7 0 0 0 11 1a2 2 0 1 1 4 0v.1A1.7 1.7 0 0 0 17 2.6a1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1A1.7 1.7 0 0 0 22.9 11H23a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+    </div>
+    <div class="segment" role="tablist">
+      <button id="tabCoffee" role="tab"><span class="s-swatch s-coffee"></span>Coffee</button>
+      <button id="tabMatcha" role="tab"><span class="s-swatch s-matcha"></span>Matcha</button>
+    </div>
+    <div class="subtabs">
+      <button id="subLogs">Log</button>
+      <button id="subLibrary">Library</button>
+    </div>
+  </header>
+
+  <div id="nudge"></div>
+  <div class="summary" id="summary"></div>
+  <main id="list"></main>
+</div>
+
+<button class="fab" id="addBtn">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+  <span id="fabLabel">New brew</span>
+</button>
+
+<div class="scrim" id="scrim"></div>
+
+<!-- ===== Coffee log sheet ===== -->
+<div class="sheet" id="coffeeSheet" role="dialog" aria-modal="true">
+  <div class="grip"></div>
+  <div class="sheet-head">
+    <button class="txt-btn mute" data-close>Cancel</button>
+    <h2 id="cTitle">New coffee</h2>
+    <button class="txt-btn" id="cSaveTop">Save</button>
+  </div>
+  <div class="sheet-body">
+    <div class="field">
+      <label>Bean</label>
+      <select id="cBean"></select>
+    </div>
+    <div class="field" id="cBeanFreeWrap" style="display:none;">
+      <label>Bean name</label>
+      <input type="text" id="cBeanFree" placeholder="e.g. Ethiopia Guji, natural" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label>Brew method</label>
+      <div class="chips-row" id="cMethod"></div>
+    </div>
+    <div class="field">
+      <label>Grinder</label>
+      <select id="cGrinder"></select>
+    </div>
+    <div class="grid">
+      <div class="field">
+        <label>Grind setting</label>
+        <input type="text" id="cGrind" placeholder="e.g. 18 clicks" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label>Dose (g)</label>
+        <input type="number" id="cDose" inputmode="decimal" step="0.1" placeholder="18" />
+      </div>
+      <div class="field">
+        <label>Water (g)</label>
+        <input type="number" id="cWater" inputmode="decimal" step="1" placeholder="288" />
+      </div>
+      <div class="field">
+        <label>Water temp</label>
+        <div class="with-suffix">
+          <input type="number" id="cTemp" inputmode="decimal" step="1" placeholder="94" />
+          <span class="suffix c-unit">°C</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Brew time (m:ss)</label>
+        <input type="text" id="cTime" inputmode="numeric" placeholder="2:45" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label>Ratio</label>
+        <div class="ratio-input">
+          <span class="rp">1:</span>
+          <input type="text" id="cRatio" inputmode="decimal" placeholder="16" autocomplete="off" />
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <div class="rate-row">
+        <label style="margin:0">Rating</label>
+        <button class="txt-btn mute" id="cRateClear" style="font-size:13px; padding:2px 4px;">Clear</button>
+      </div>
+      <div class="rate-pips" id="cPips"></div>
+    </div>
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="cNotes" placeholder="How did it taste? What would you change?"></textarea>
+    </div>
+  </div>
+  <div class="save-bar">
+    <button class="btn-primary" id="cSave">Save brew</button>
+    <button class="btn-ghost" id="cDelete" style="display:none;">Delete</button>
+  </div>
+</div>
+
+<!-- ===== Matcha log sheet ===== -->
+<div class="sheet" id="matchaSheet" role="dialog" aria-modal="true">
+  <div class="grip"></div>
+  <div class="sheet-head">
+    <button class="txt-btn mute" data-close>Cancel</button>
+    <h2 id="mTitle">New matcha</h2>
+    <button class="txt-btn" id="mSaveTop">Save</button>
+  </div>
+  <div class="sheet-body">
+    <div class="field">
+      <label>Matcha</label>
+      <select id="mMatcha"></select>
+    </div>
+    <div class="field" id="mMatchaFreeWrap" style="display:none;">
+      <label>Matcha name</label>
+      <input type="text" id="mMatchaFree" placeholder="e.g. Ippodo Ummon" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label>Prep style</label>
+      <div class="seg-mini" id="mPrep">
+        <button data-v="latte">Latte</button>
+        <button data-v="iced">Iced</button>
+      </div>
+    </div>
+    <div class="grid">
+      <div class="field">
+        <label>Matcha (g)</label>
+        <input type="number" id="mAmount" inputmode="decimal" step="0.1" placeholder="3" />
+      </div>
+      <div class="field">
+        <label>Water (ml)</label>
+        <input type="number" id="mWater" inputmode="decimal" step="1" placeholder="30" />
+      </div>
+      <div class="field">
+        <label>Water temp</label>
+        <div class="with-suffix">
+          <input type="number" id="mTemp" inputmode="decimal" step="1" placeholder="75" />
+          <span class="suffix c-unit">°C</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Milk</label>
+        <input type="text" id="mMilk" list="milkList" placeholder="e.g. oat" autocomplete="off" />
+        <datalist id="milkList">
+          <option value="Whole"></option><option value="Oat"></option><option value="Almond"></option>
+          <option value="2%"></option><option value="Soy"></option><option value="None"></option>
+        </datalist>
+      </div>
+    </div>
+    <div class="ratio-readout">Ratio<b id="mRatio">—</b><button class="ratio-hint" id="mSuggest" type="button"></button></div>
+    <div class="field">
+      <label>Whisk</label>
+      <div class="seg-mini" id="mWhisk">
+        <button data-v="chasen">Chasen</button>
+        <button data-v="electric">Electric</button>
+        <button data-v="shaker">Shaker</button>
+      </div>
+    </div>
+    <div class="field">
+      <div class="switch-row">
+        <span>Sifted</span>
+        <button class="sw" id="mSifted" role="switch" aria-checked="false" aria-label="Sifted"></button>
+      </div>
+    </div>
+    <details class="more">
+      <summary>More — milk amount & sweetener</summary>
+      <div class="inner">
+        <div class="grid">
+          <div class="field">
+            <label>Milk (ml)</label>
+            <input type="number" id="mMilkAmt" inputmode="decimal" step="10" placeholder="180" />
+          </div>
+          <div class="field">
+            <label>Sweetener</label>
+            <input type="text" id="mSweet" placeholder="e.g. honey 1 tsp" autocomplete="off" />
+          </div>
+        </div>
+      </div>
+    </details>
+    <div class="field">
+      <div class="rate-row">
+        <label style="margin:0">Rating</label>
+        <button class="txt-btn mute" id="mRateClear" style="font-size:13px; padding:2px 4px;">Clear</button>
+      </div>
+      <div class="rate-pips" id="mPips"></div>
+    </div>
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="mNotes" placeholder="How did it taste? What would you change?"></textarea>
+    </div>
+  </div>
+  <div class="save-bar">
+    <button class="btn-primary" id="mSave">Save matcha</button>
+    <button class="btn-ghost" id="mDelete" style="display:none;">Delete</button>
+  </div>
+</div>
+
+<!-- ===== Library sheet (shared, re-labeled per drink) ===== -->
+<div class="sheet" id="libSheet" role="dialog" aria-modal="true">
+  <div class="grip"></div>
+  <div class="sheet-head">
+    <button class="txt-btn mute" data-close>Cancel</button>
+    <h2 id="lTitle">Add bag</h2>
+    <button class="txt-btn" id="lSaveTop">Save</button>
+  </div>
+  <div class="sheet-body">
+    <div class="field">
+      <label>Photo</label>
+      <div class="photo-box">
+        <div class="pv" id="lPhotoPv">📷</div>
+        <div class="pb">
+          <button type="button" id="lPhotoPick">Add photo of packaging</button>
+          <button type="button" class="rm" id="lPhotoRemove" style="display:none;">Remove photo</button>
+        </div>
+      </div>
+      <input type="file" id="lPhotoInput" accept="image/*" style="display:none;" />
+    </div>
+    <div class="field">
+      <label id="lNameLabel">Bean / roaster</label>
+      <input type="text" id="lName" placeholder="e.g. Ethiopia Guji — Roaster Co." autocomplete="off" />
+    </div>
+    <div class="field" id="lGradeWrap" style="display:none;">
+      <label>Grade</label>
+      <input type="text" id="lGrade" list="gradeList" placeholder="e.g. ceremonial" autocomplete="off" />
+      <datalist id="gradeList">
+        <option value="Ceremonial"></option><option value="Premium"></option><option value="Culinary"></option>
+      </datalist>
+    </div>
+    <div class="field">
+      <label>Origin</label>
+      <input type="text" id="lOrigin" placeholder="e.g. Guji, Ethiopia" autocomplete="off" />
+    </div>
+    <div class="field" id="lRoastWrap">
+      <label>Roast notes</label>
+      <input type="text" id="lRoast" placeholder="e.g. light, floral, blueberry" autocomplete="off" />
+    </div>
+    <div class="grid">
+      <div class="field">
+        <label>Price paid</label>
+        <input type="number" id="lPrice" inputmode="decimal" step="0.01" placeholder="21.50" />
+      </div>
+      <div class="field">
+        <label id="lSizeLabel">Bag size (g)</label>
+        <input type="number" id="lSize" inputmode="decimal" step="1" placeholder="250" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="lNotes" placeholder="Anything worth remembering about this one"></textarea>
+    </div>
+  </div>
+  <div class="save-bar">
+    <button class="btn-primary" id="lSave">Save</button>
+    <button class="btn-ghost" id="lDelete" style="display:none;">Delete</button>
+  </div>
+</div>
+
+<!-- ===== Settings sheet ===== -->
+<div class="sheet" id="setSheet" role="dialog" aria-modal="true">
+  <div class="grip"></div>
+  <div class="sheet-head">
+    <span style="width:52px"></span>
+    <h2>Settings</h2>
+    <button class="txt-btn" data-close>Done</button>
+  </div>
+  <div class="sheet-body">
+    <div class="set-group">
+      <div class="set-row">
+        <div>Appearance</div>
+        <div class="toggle-pills" id="themeToggle">
+          <button data-v="auto">Auto</button>
+          <button data-v="light">Light</button>
+          <button data-v="dark">Dark</button>
+        </div>
+      </div>
+      <div class="set-row">
+        <div><div>Temperature unit</div><div class="desc">Label only — numbers aren't converted</div></div>
+        <div class="toggle-pills" id="unitToggle">
+          <button data-v="C">°C</button>
+          <button data-v="F">°F</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="set-note">Grinders</div>
+    <div class="set-group" id="grinderList"></div>
+
+    <div class="set-note">Cloud backup — your own private Cloudflare Worker.</div>
+    <div id="cloudPanel"></div>
+
+    <div class="set-note" style="margin-top:16px;">File backups — the third safety layer. Export now and then.</div>
+    <div class="set-group">
+      <button class="set-row" id="exportFile">
+        <div><div>Save backup file</div><div class="desc">One .json with everything, photos included</div></div>
+        <span class="chev">›</span>
+      </button>
+      <button class="set-row" id="copyBackup">
+        <div><div>Copy backup to clipboard</div><div class="desc">Without photos — paste anywhere safe</div></div>
+        <span class="chev">›</span>
+      </button>
+      <button class="set-row" id="importFile">
+        <div><div>Restore from file</div><div class="desc">Merges — never wipes what's here</div></div>
+        <span class="chev">›</span>
+      </button>
+      <button class="set-row" id="pasteRestore">
+        <div><div>Restore from pasted text</div><div class="desc">For when a file won't open</div></div>
+        <span class="chev">›</span>
+      </button>
+    </div>
+    <input type="file" id="fileInput" accept="application/json,.json" style="display:none" />
+    <div id="pasteWrap" style="display:none; margin-bottom:16px;">
+      <textarea class="paste-area" id="pasteBox" placeholder="Paste backup JSON here…"></textarea>
+      <button class="btn-primary" id="pasteConfirm" style="margin-top:10px; width:100%;">Restore</button>
+    </div>
+
+    <div class="set-note" style="text-align:center; padding-top:6px;" id="countLine"></div>
+    <div class="set-group" style="margin-top:14px;">
+      <button class="set-row" id="wipe" style="color:var(--danger)">
+        <div>Delete all data</div><span class="chev">›</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================== constants ============================== */
+const DB_NAME = "brewlog";
+const DB_VERSION = 1;          // IndexedDB structural version
+const APP_SCHEMA = 2;          // app data schema version (v1 was the old localStorage format)
+const STORES = ["coffee_library","matcha_library","coffee_logs","matcha_logs","grinders","meta"];
+const METHODS = ["V60","AeroPress","Espresso","French press","Pour-over","Other"];
+const NUDGE_DAYS = 7, NUDGE_DIRTY = 15;
+
+const $ = (s)=>document.querySelector(s);
+const $$ = (s)=>Array.from(document.querySelectorAll(s));
+const root = document.documentElement;
+
+/* ============================== IndexedDB ============================== */
+let _db = null;
+function openDB(){
+  return new Promise((res, rej)=>{
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = ()=>{
+      const db = req.result;
+      // v0 -> v1: create all stores. Future versions: add cases, never delete stores.
+      if(!db.objectStoreNames.contains("meta")) db.createObjectStore("meta", { keyPath:"key" });
+      for(const s of ["coffee_library","matcha_library","coffee_logs","matcha_logs","grinders"]){
+        if(!db.objectStoreNames.contains(s)) db.createObjectStore(s, { keyPath:"id" });
+      }
+    };
+    req.onsuccess = ()=>{ _db = req.result; _db.onversionchange = ()=>_db.close(); res(_db); };
+    req.onerror = ()=>rej(req.error);
+  });
+}
+function tx(store, mode, fn){
+  return new Promise((res, rej)=>{
+    const t = _db.transaction(store, mode);
+    const s = t.objectStore(store);
+    let out;
+    try { out = fn(s); } catch(e){ rej(e); return; }
+    t.oncomplete = ()=>res(out && "result" in out ? out.result : undefined);
+    t.onerror = ()=>rej(t.error);
+    t.onabort = ()=>rej(t.error || new Error("aborted"));
+  });
+}
+const dbPut    = (store, val)=>tx(store, "readwrite", s=>s.put(val));
+const dbDel    = (store, id) =>tx(store, "readwrite", s=>s.delete(id));
+const dbClear  = (store)     =>tx(store, "readwrite", s=>s.clear());
+function dbGetAll(store){
+  return new Promise((res, rej)=>{
+    const t = _db.transaction(store, "readonly");
+    const r = t.objectStore(store).getAll();
+    r.onsuccess = ()=>res(r.result || []);
+    r.onerror = ()=>rej(r.error);
+  });
+}
+async function getMeta(key, def){
+  const row = await new Promise((res, rej)=>{
+    const t = _db.transaction("meta","readonly");
+    const r = t.objectStore("meta").get(key);
+    r.onsuccess = ()=>res(r.result); r.onerror = ()=>rej(r.error);
+  });
+  return row ? row.value : def;
+}
+const setMeta = (key, value)=>dbPut("meta", { key, value });
+
+/* ============================== state ============================== */
+const S = {
+  settings: { theme:"auto", tempUnit:"C" },
+  defaults: { coffee:{}, matcha:{} },
+  backup: { lastExportAt:null, dirty:0, snoozeUntil:0 },
+  cloud: { url:"", key:"", lastSyncAt:null, pending:{ upserts:{}, deletes:{} } },
+  coffeeLib:[], matchaLib:[], coffeeLogs:[], matchaLogs:[], grinders:[]
+};
+let nav = { drink:"coffee", tab:"logs" };
+let editingLog = null, editingLib = null, draftRating = 0, draftPhoto = undefined; // undefined = unchanged
+let openSheetEl = null;
+
+/* ============================== helpers ============================== */
+const uid = (p)=>p + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+const now = ()=>new Date().toISOString();
+const num = (v)=>{ const n = parseFloat(v); return isFinite(n) ? n : null; };
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function parseTime(s){
+  if(!s) return null; s = String(s).trim();
+  if(s.includes(":")){ const [m,sec] = s.split(":"); const mm=parseInt(m||"0",10), ss=parseInt(sec||"0",10);
+    if(isNaN(mm)&&isNaN(ss)) return null; return (mm||0)*60 + (ss||0); }
+  const n = parseInt(s,10); return isNaN(n) ? null : n;
+}
+function fmtTime(sec){ if(sec==null) return null; const m=Math.floor(sec/60), s=sec%60; return m+":"+String(s).padStart(2,"0"); }
+function ratioOf(w,d){ if(!w||!d) return null; return "1:"+(w/d).toFixed(1); }
+const unitLabel = ()=> S.settings.tempUnit==="F" ? "°F" : "°C";
+function money(v){ return v==null ? null : "$"+Number(v).toFixed(2); }
+function dayLabel(iso){
+  const d = new Date(iso), n = new Date();
+  const strip = (x)=>new Date(x.getFullYear(),x.getMonth(),x.getDate());
+  const diff = Math.round((strip(n)-strip(d))/86400000);
+  if(diff===0) return "Today";
+  if(diff===1) return "Yesterday";
+  if(diff>1 && diff<7) return d.toLocaleDateString(undefined,{weekday:"long"});
+  return d.toLocaleDateString(undefined,{month:"long", day:"numeric", year: d.getFullYear()!==n.getFullYear()?"numeric":undefined});
+}
+function timeLabel(iso){ return new Date(iso).toLocaleTimeString(undefined,{hour:"numeric", minute:"2-digit"}); }
+
+let toastT;
+function toast(msg){
+  const el = $("#toast"); el.textContent = msg; el.classList.add("show");
+  clearTimeout(toastT); toastT = setTimeout(()=>el.classList.remove("show"), 2200);
+}
+
+/* In-app dialogs — native confirm()/prompt() are unreliable (often suppressed)
+   inside installed iOS PWAs, which silently cancels destructive actions. */
+function uiConfirm(opts){
+  opts = opts || {};
+  return new Promise((resolve)=>{
+    const back = document.createElement("div");
+    back.className = "dlg-back";
+    back.innerHTML =
+      `<div class="dlg" role="dialog" aria-modal="true">
+        <div class="dlg-title">${esc(opts.title||"Are you sure?")}</div>
+        ${opts.message?`<div class="dlg-msg">${esc(opts.message)}</div>`:""}
+        <div class="dlg-actions">
+          <button class="dlg-btn cancel" type="button">${esc(opts.cancelLabel||"Cancel")}</button>
+          <button class="dlg-btn ${opts.danger?"danger":"primary"} ok" type="button">${esc(opts.confirmLabel||"OK")}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(back);
+    requestAnimationFrame(()=>back.classList.add("show"));
+    let settled = false;
+    const done = (val)=>{ if(settled) return; settled = true;
+      back.classList.remove("show"); setTimeout(()=>back.remove(), 220); resolve(val); };
+    back.querySelector(".cancel").addEventListener("click", ()=>done(false));
+    back.querySelector(".ok").addEventListener("click", ()=>done(true));
+    back.addEventListener("click", (e)=>{ if(e.target===back) done(false); });
+  });
+}
+function uiPrompt(opts){
+  opts = opts || {};
+  return new Promise((resolve)=>{
+    const back = document.createElement("div");
+    back.className = "dlg-back";
+    back.innerHTML =
+      `<div class="dlg" role="dialog" aria-modal="true">
+        <div class="dlg-title">${esc(opts.title||"")}</div>
+        ${opts.message?`<div class="dlg-msg">${esc(opts.message)}</div>`:""}
+        <input class="dlg-input" type="text" placeholder="${esc(opts.placeholder||"")}" value="${esc(opts.value||"")}" autocomplete="off" />
+        <div class="dlg-actions">
+          <button class="dlg-btn cancel" type="button">Cancel</button>
+          <button class="dlg-btn primary ok" type="button">${esc(opts.confirmLabel||"Add")}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(back);
+    const input = back.querySelector(".dlg-input");
+    requestAnimationFrame(()=>{ back.classList.add("show"); try{ input.focus(); }catch(e){} });
+    let settled = false;
+    const done = (val)=>{ if(settled) return; settled = true;
+      back.classList.remove("show"); setTimeout(()=>back.remove(), 220); resolve(val); };
+    back.querySelector(".cancel").addEventListener("click", ()=>done(null));
+    back.querySelector(".ok").addEventListener("click", ()=>done(input.value.trim() || null));
+    input.addEventListener("keydown", (e)=>{ if(e.key==="Enter") done(input.value.trim() || null); });
+    back.addEventListener("click", (e)=>{ if(e.target===back) done(null); });
+  });
+}
+
+/* object-URL registry so thumbnails don't leak */
+let objURLs = [];
+function freshObjURL(blob){
+  if(typeof URL === "undefined" || !URL.createObjectURL) return null;
+  try { const u = URL.createObjectURL(blob); objURLs.push(u); return u; } catch(e){ return null; }
+}
+function revokeObjURLs(){
+  if(typeof URL === "undefined" || !URL.revokeObjectURL) { objURLs = []; return; }
+  for(const u of objURLs){ try{ URL.revokeObjectURL(u); }catch(e){} }
+  objURLs = [];
+}
+
+/* ============================== photos ============================== */
+function loadImage(url){
+  return new Promise((res, rej)=>{
+    const img = new Image();
+    img.onload = ()=>res(img);
+    img.onerror = ()=>rej(new Error("image load failed"));
+    img.src = url;
+  });
+}
+function canvasToBlob(canvas, type, quality){
+  return new Promise((res)=>{
+    try{
+      if(canvas.toBlob){ canvas.toBlob((b)=>res(b), type, quality); }
+      else { res(dataURLToBlob(canvas.toDataURL(type, quality))); } // older Safari
+    }catch(e){ res(null); }
+  });
+}
+async function drawToJpeg(source, sw, sh, maxDim){
+  const scale = Math.min(1, maxDim / Math.max(sw, sh));
+  const w = Math.max(1, Math.round(sw*scale));
+  const h = Math.max(1, Math.round(sh*scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if(!ctx) return null;
+  ctx.drawImage(source, 0, 0, w, h);
+  return await canvasToBlob(canvas, "image/jpeg", 0.82);
+}
+// Robust across iOS: decode straight from the Blob (no object URL, handles HEIC),
+// fall back to a FileReader data URL, and never hard-fail on a real image.
+async function downscalePhoto(file, maxDim){
+  maxDim = maxDim || 1280;
+
+  // 1) createImageBitmap works directly on the File/Blob and is the most reliable
+  //    path on modern iOS Safari (including HEIC from the photo library).
+  if(typeof createImageBitmap === "function"){
+    try{
+      const bmp = await createImageBitmap(file);
+      const w = bmp.width, h = bmp.height;
+      if(w && h){
+        const blob = await drawToJpeg(bmp, w, h, maxDim);
+        if(bmp.close) bmp.close();
+        if(blob) return blob;
+      } else if(bmp.close){ bmp.close(); }
+    }catch(e){ /* fall through */ }
+  }
+
+  // 2) FileReader data URL -> Image -> canvas. Data URLs decode reliably even in
+  //    installed (standalone) PWAs, where object URLs have historically been flaky.
+  try{
+    const durl = await blobToDataURL(file);
+    const img = await Promise.race([
+      loadImage(durl),
+      new Promise((_, rej)=>setTimeout(()=>rej(new Error("decode timeout")), 12000))
+    ]);
+    const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+    if(w && h){
+      const blob = await drawToJpeg(img, w, h, maxDim);
+      if(blob) return blob;
+    }
+  }catch(e){ /* fall through */ }
+
+  // 3) Last resort: keep the original file so a photo is never lost to a decode hiccup.
+  if(file instanceof Blob && (!(file.type) || file.type.startsWith("image/"))) return file;
+  throw new Error("unreadable image");
+}
+function blobToDataURL(blob){
+  return new Promise((res, rej)=>{
+    const r = new FileReader();
+    r.onload = ()=>res(r.result);
+    r.onerror = ()=>rej(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+function dataURLToBlob(durl){
+  try{
+    const [head, b64] = durl.split(",");
+    const mime = (head.match(/data:(.*?);/)||[])[1] || "image/jpeg";
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], {type:mime});
+  }catch(e){ return null; }
+}
+
+/* ============================== load / boot ============================== */
+async function loadAll(){
+  S.settings = Object.assign({ theme:"auto", tempUnit:"C" }, await getMeta("settings", {}));
+  S.defaults = Object.assign({ coffee:{}, matcha:{} }, await getMeta("defaults", {}));
+  S.backup   = Object.assign({ lastExportAt:null, dirty:0, snoozeUntil:0 }, await getMeta("backup", {}));
+  S.cloud    = Object.assign({ url:"", key:"", lastSyncAt:null, pending:{ upserts:{}, deletes:{} } }, await getMeta("cloud", {}));
+  if(!S.cloud.pending || typeof S.cloud.pending !== "object") S.cloud.pending = { upserts:{}, deletes:{} };
+  S.cloud.pending.upserts = S.cloud.pending.upserts || {};
+  S.cloud.pending.deletes = S.cloud.pending.deletes || {};
+  S.coffeeLib  = await dbGetAll("coffee_library");
+  S.matchaLib  = await dbGetAll("matcha_library");
+  S.coffeeLogs = await dbGetAll("coffee_logs");
+  S.matchaLogs = await dbGetAll("matcha_logs");
+  S.grinders   = await dbGetAll("grinders");
+}
+
+/* one-time, non-destructive migration from the old localStorage build */
+async function migrateLegacy(){
+  if(await getMeta("legacyMigrated", false)) return;
+  try{
+    const raw = (typeof localStorage !== "undefined") && localStorage.getItem("brewlog.v1");
+    if(raw){
+      const p = JSON.parse(raw);
+      if(p && Array.isArray(p.brews)){
+        for(const b of p.brews){
+          const base = { createdAt: b.date || now(), updatedAt: b.date || now(), date: b.date || now(),
+                         rating: b.rating||0, notes: b.notes||"", beanNotes: b.beanNotes||"",
+                         temp: b.temp==null?null:b.temp, tempUnit: b.tempUnit||"°C" };
+          if(b.type === "matcha"){
+            await dbPut("matcha_logs", Object.assign({ id:"mlog_legacy_"+b.id, matchaId:null,
+              matchaName:b.bean||"", prepStyle:"", amount:b.dose==null?null:b.dose,
+              water:b.water==null?null:b.water, milkType:"", milkAmount:null, sweetener:"",
+              whiskType:"", sifted:null }, base));
+          } else {
+            await dbPut("coffee_logs", Object.assign({ id:"clog_legacy_"+b.id, beanId:null,
+              beanName:b.bean||"", method:"", grinderId:null, grinderName:"",
+              grindSetting:b.grind||"", dose:b.dose==null?null:b.dose,
+              water:b.water==null?null:b.water, timeSec:b.timeSec==null?null:b.timeSec }, base));
+          }
+        }
+      }
+      if(p && p.settings && p.settings.tempUnit){
+        const st = await getMeta("settings", {});
+        st.tempUnit = p.settings.tempUnit;
+        await setMeta("settings", st);
+      }
+      // localStorage copy is left in place on purpose — belt and suspenders.
+    }
+  }catch(e){ /* never block boot on legacy data */ }
+  await setMeta("legacyMigrated", true);
+  await setMeta("schemaVersion", APP_SCHEMA);
+}
+
+/* ============================== theme ============================== */
+const darkMQ = (typeof matchMedia === "function") ? matchMedia("(prefers-color-scheme: dark)") : null;
+function applyTheme(){
+  const t = S.settings.theme || "auto";
+  const dark = t==="dark" || (t==="auto" && darkMQ && darkMQ.matches);
+  root.setAttribute("data-theme", dark ? "dark" : "light");
+  // Point both status-bar color metas at the resolved theme so the top bar
+  // matches in every case, including a manual override against the system setting.
+  const col = dark ? "#171310" : "#FBF9F5";
+  const tcL = document.getElementById("tcLight"), tcD = document.getElementById("tcDark");
+  if(tcL) tcL.setAttribute("content", col);
+  if(tcD) tcD.setAttribute("content", col);
+  if($("#themeToggle")) $$("#themeToggle button").forEach(b=>b.classList.toggle("on", b.dataset.v===t));
+}
+if(darkMQ && darkMQ.addEventListener) darkMQ.addEventListener("change", ()=>{ if((S.settings.theme||"auto")==="auto") applyTheme(); });
+
+/* ============================== dirty tracking / nudge ============================== */
+async function markDirty(){
+  S.backup.dirty = (S.backup.dirty||0) + 1;
+  await setMeta("backup", S.backup);
+}
+function needsNudge(){
+  const hasData = S.coffeeLogs.length + S.matchaLogs.length + S.coffeeLib.length + S.matchaLib.length > 0;
+  if(!hasData) return false;
+  // Cloud backup that synced within a week counts as backed up.
+  if(cloudEnabled() && S.cloud.lastSyncAt && (Date.now() - new Date(S.cloud.lastSyncAt).getTime()) < NUDGE_DAYS*86400000 && !pendingCount()) return false;
+  if(Date.now() < (S.backup.snoozeUntil||0)) return false;
+  if(!S.backup.lastExportAt) return (S.backup.dirty||0) >= 3;
+  const days = (Date.now() - new Date(S.backup.lastExportAt).getTime()) / 86400000;
+  return days > NUDGE_DAYS || (S.backup.dirty||0) >= NUDGE_DIRTY;
+}
+function renderNudge(){
+  const el = $("#nudge");
+  if(!needsNudge()){ el.innerHTML=""; return; }
+  const last = S.backup.lastExportAt
+    ? "Last backup " + new Date(S.backup.lastExportAt).toLocaleDateString(undefined,{month:"short",day:"numeric"})
+    : "No backup yet";
+  el.innerHTML = `<div class="nudge">
+    <p><b>${last}.</b> Your log lives only on this phone — save a backup file.</p>
+    <button class="go" id="nudgeGo">Back up</button>
+    <button class="later" id="nudgeLater">Later</button>
+  </div>`;
+  $("#nudgeGo").onclick = exportData;
+  $("#nudgeLater").onclick = async ()=>{
+    S.backup.snoozeUntil = Date.now() + 3*86400000;
+    await setMeta("backup", S.backup); renderNudge();
+  };
+}
+
+/* ============================== rendering ============================== */
+function setNav(drink, tab){
+  nav.drink = drink || nav.drink; nav.tab = tab || nav.tab;
+  root.setAttribute("data-drink", nav.drink);
+  $("#tabCoffee").classList.toggle("on", nav.drink==="coffee");
+  $("#tabMatcha").classList.toggle("on", nav.drink==="matcha");
+  $("#subLogs").classList.toggle("on", nav.tab==="logs");
+  $("#subLibrary").classList.toggle("on", nav.tab==="library");
+  $("#fabLabel").textContent = nav.tab==="library"
+    ? (nav.drink==="coffee" ? "Add bag" : "Add tin")
+    : (nav.drink==="coffee" ? "New coffee" : "New matcha");
+  render();
+}
+
+function render(){
+  revokeObjURLs();
+  renderNudge();
+  if(nav.tab==="logs") renderLogs(); else renderLibrary();
+}
+
+function libName(drink, id){
+  const lib = drink==="coffee" ? S.coffeeLib : S.matchaLib;
+  const e = lib.find(x=>x.id===id);
+  return e ? (drink==="coffee" ? e.name : e.brand) : null;
+}
+function grinderName(id){ const g = S.grinders.find(x=>x.id===id); return g ? g.name : null; }
+
+function renderLogs(){
+  const drink = nav.drink;
+  const logs = (drink==="coffee" ? S.coffeeLogs : S.matchaLogs).slice()
+    .sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const rated = logs.filter(l=>l.rating>0);
+  const avg = rated.length ? (rated.reduce((s,l)=>s+l.rating,0)/rated.length) : null;
+  $("#summary").innerHTML =
+    `<div><span class="n">${logs.length}</span><span class="l">${drink==="coffee"?"Brews":"Cups"}</span></div>` +
+    (avg!=null ? `<div><span class="n">${avg.toFixed(1)}</span><span class="l">Avg rating</span></div>` : "");
+
+  const list = $("#list");
+  if(!logs.length){
+    list.innerHTML = `<div class="empty"><div class="cup">${drink==="coffee"?"☕️":"🍵"}</div>
+      <h2>No ${drink==="coffee"?"coffee brews":"matcha cups"} yet</h2>
+      <p>Tap <b>${drink==="coffee"?"New coffee":"New matcha"}</b> to log your first one.</p></div>`;
+    return;
+  }
+  let html = "", lastDay = null;
+  for(const l of logs){
+    const dl = dayLabel(l.date);
+    if(dl!==lastDay){ html += `<div class="day-label">${esc(dl)}</div>`; lastDay = dl; }
+    html += drink==="coffee" ? coffeeCard(l) : matchaCard(l);
+  }
+  list.innerHTML = html;
+  list.querySelectorAll("[data-log]").forEach(el=>{
+    el.addEventListener("click", ()=>{
+      const arr = drink==="coffee" ? S.coffeeLogs : S.matchaLogs;
+      const log = arr.find(x=>x.id===el.dataset.log);
+      if(log) drink==="coffee" ? openCoffeeLog(log) : openMatchaLog(log);
+    });
+  });
+}
+
+function pipsHTML(r){ return `<div class="pips">${Array.from({length:5},(_,i)=>`<span class="pip ${i<r?'f':''}"></span>`).join("")}</div>`; }
+
+function coffeeCard(l){
+  const name = (l.beanId && libName("coffee", l.beanId)) || l.beanName || "Coffee";
+  const chips = [];
+  const r = ratioOf(l.water, l.dose);
+  if(r) chips.push(`<span class="chip ratio">${r}</span>`);
+  if(l.method) chips.push(`<span class="chip"><b>Method</b>${esc(l.method)}</span>`);
+  if(l.dose!=null) chips.push(`<span class="chip"><b>Dose</b>${l.dose}g</span>`);
+  if(l.water!=null) chips.push(`<span class="chip"><b>Water</b>${l.water}g</span>`);
+  if(l.temp!=null) chips.push(`<span class="chip"><b>Temp</b>${l.temp}${esc(l.tempUnit||unitLabel())}</span>`);
+  if(l.timeSec!=null) chips.push(`<span class="chip"><b>Time</b>${fmtTime(l.timeSec)}</span>`);
+  const gn = (l.grinderId && grinderName(l.grinderId)) || l.grinderName;
+  if(gn || l.grindSetting) chips.push(`<span class="chip"><b>Grind</b>${esc([gn, l.grindSetting].filter(Boolean).join(" · "))}</span>`);
+  const sub = [l.beanNotes, timeLabel(l.date)].filter(Boolean).join(" · ");
+  return card(l.id, name, sub, l.rating, chips, l.notes);
+}
+
+function matchaCard(l){
+  const name = (l.matchaId && libName("matcha", l.matchaId)) || l.matchaName || "Matcha";
+  const chips = [];
+  if(l.prepStyle) chips.push(`<span class="chip ratio">${esc(l.prepStyle==="latte"?"Latte":l.prepStyle==="iced"?"Iced":l.prepStyle)}</span>`);
+  const r = ratioOf(l.water, l.amount);
+  if(r) chips.push(`<span class="chip ratio">${r}</span>`);
+  if(l.amount!=null) chips.push(`<span class="chip"><b>Matcha</b>${l.amount}g</span>`);
+  if(l.water!=null) chips.push(`<span class="chip"><b>Water</b>${l.water}ml</span>`);
+  if(l.temp!=null) chips.push(`<span class="chip"><b>Temp</b>${l.temp}${esc(l.tempUnit||unitLabel())}</span>`);
+  if(l.milkType) chips.push(`<span class="chip"><b>Milk</b>${esc(l.milkType)}${l.milkAmount!=null?` ${l.milkAmount}ml`:""}</span>`);
+  if(l.whiskType) chips.push(`<span class="chip"><b>Whisk</b>${esc(l.whiskType)}</span>`);
+  if(l.sifted===true) chips.push(`<span class="chip">Sifted</span>`);
+  if(l.sweetener) chips.push(`<span class="chip"><b>Sweet</b>${esc(l.sweetener)}</span>`);
+  const sub = [l.beanNotes, timeLabel(l.date)].filter(Boolean).join(" · ");
+  return card(l.id, name, sub, l.rating, chips, l.notes);
+}
+
+function card(id, name, sub, rating, chips, notes){
+  return `<button class="brew" data-log="${esc(id)}">
+    <div class="brew-row">
+      <div class="accent-line"></div>
+      <div style="flex:1; min-width:0;">
+        <div class="brew-top">
+          <div style="min-width:0;">
+            <div class="brew-name">${esc(name)}</div>
+            <div class="brew-sub">${esc(sub)}</div>
+          </div>
+          ${rating>0?pipsHTML(rating):""}
+        </div>
+        ${chips.length?`<div class="stats">${chips.join("")}</div>`:""}
+        ${notes?`<div class="brew-notes">${esc(notes)}</div>`:""}
+      </div>
+    </div>
+  </button>`;
+}
+
+function renderLibrary(){
+  const drink = nav.drink;
+  const lib = (drink==="coffee" ? S.coffeeLib : S.matchaLib).slice()
+    .sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  const spent = lib.reduce((s,e)=>s+(e.price||0),0);
+  $("#summary").innerHTML =
+    `<div><span class="n">${lib.length}</span><span class="l">${drink==="coffee"?"Bags":"Tins"}</span></div>` +
+    (spent>0?`<div><span class="n">${money(spent)}</span><span class="l">Spent</span></div>`:"");
+
+  const list = $("#list");
+  if(!lib.length){
+    list.innerHTML = `<div class="empty"><div class="cup">${drink==="coffee"?"🫘":"🍵"}</div>
+      <h2>No ${drink==="coffee"?"bags":"tins"} yet</h2>
+      <p>Tap <b>${drink==="coffee"?"Add bag":"Add tin"}</b> to save one —<br/>photo, price, and notes included.</p></div>`;
+    return;
+  }
+  list.innerHTML = lib.map(e=>{
+    const nm = drink==="coffee" ? e.name : e.brand;
+    const sub = drink==="coffee"
+      ? [e.origin, e.roastNotes].filter(Boolean).join(" · ")
+      : [e.grade, e.origin].filter(Boolean).join(" · ");
+    const size = e.size!=null ? `${e.size}g` : "";
+    const url = e.photo ? freshObjURL(e.photo) : null;
+    return `<button class="lib" data-lib="${esc(e.id)}">
+      <div class="thumb">${url?`<img src="${url}" alt="">`:(drink==="coffee"?"🫘":"🍵")}</div>
+      <div class="lb">
+        <div class="nm">${esc(nm)||"Untitled"}</div>
+        <div class="sb">${esc([sub,size].filter(Boolean).join(" · "))}</div>
+      </div>
+      ${e.price!=null?`<div class="pr">${money(e.price)}</div>`:""}
+    </button>`;
+  }).join("");
+  list.querySelectorAll("[data-lib]").forEach(el=>{
+    el.addEventListener("click", ()=>{
+      const e = lib.find(x=>x.id===el.dataset.lib);
+      if(e) openLib(e);
+    });
+  });
+}
+
+/* ============================== rating pips (shared) ============================== */
+function renderPips(sel){
+  const wrap = $(sel); wrap.innerHTML = "";
+  for(let i=1;i<=5;i++){
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = i<=draftRating ? "f" : "";
+    b.setAttribute("aria-label", i+" star"+(i>1?"s":""));
+    b.onclick = ()=>{ draftRating = i; renderPips(sel); };
+    wrap.appendChild(b);
+  }
+}
+
+/* ============================== sheets plumbing ============================== */
+function openSheet(sel){
+  openSheetEl = $(sel);
+  $("#scrim").classList.add("show");
+  openSheetEl.classList.add("show");
+  document.body.style.overflow = "hidden";
+}
+function closeSheet(){
+  if(openSheetEl) openSheetEl.classList.remove("show");
+  $("#scrim").classList.remove("show");
+  document.body.style.overflow = "";
+  openSheetEl = null;
+}
+
+/* single-select chip / seg helpers */
+function setChips(containerSel, value){
+  $$(containerSel+" button").forEach(b=>b.classList.toggle("on", (b.dataset.v||b.textContent)===value));
+}
+function chipValue(containerSel){
+  const on = $(containerSel+" button.on");
+  return on ? (on.dataset.v || on.textContent) : "";
+}
+function wireChips(containerSel, allowToggleOff){
+  $$(containerSel+" button").forEach(b=>{
+    b.addEventListener("click", ()=>{
+      const was = b.classList.contains("on");
+      $$(containerSel+" button").forEach(x=>x.classList.remove("on"));
+      if(!(allowToggleOff && was)) b.classList.add("on");
+    });
+  });
+}
+
+/* ============================== coffee log sheet ============================== */
+function fillBeanSelect(selectedId){
+  const sel = $("#cBean");
+  const opts = [`<option value="">— choose a bean —</option>`]
+    .concat(S.coffeeLib.map(e=>`<option value="${esc(e.id)}">${esc(e.name||"Untitled")}</option>`))
+    .concat([`<option value="__free">✎ Type a name instead</option>`]);
+  sel.innerHTML = opts.join("");
+  sel.value = selectedId || "";
+  if(selectedId==="__free") sel.value = "__free";
+  $("#cBeanFreeWrap").style.display = sel.value==="__free" ? "" : "none";
+}
+function fillGrinderSelect(selectedId){
+  const sel = $("#cGrinder");
+  const opts = [`<option value="">—</option>`]
+    .concat(S.grinders.map(g=>`<option value="${esc(g.id)}">${esc(g.name)}</option>`))
+    .concat([`<option value="__add">＋ Add grinder…</option>`]);
+  sel.innerHTML = opts.join("");
+  sel.value = selectedId || "";
+}
+function methodChipsInit(){
+  $("#cMethod").innerHTML = METHODS.map(m=>`<button type="button" data-v="${esc(m)}">${esc(m)}</button>`).join("");
+  wireChips("#cMethod", true);
+}
+function parseRatio(s){
+  if(s==null) return null;
+  const x = parseFloat(String(s).trim().replace(/^1\s*:\s*/,""));
+  return (isFinite(x) && x>0) ? x : null;
+}
+function fmtRatioNum(x){ return String(Math.round(x*10)/10); }   // 16.666 -> "16.7", 16 -> "16"
+// dose+water -> ratio field
+function ratioFromDoseWater(){
+  const d = num($("#cDose").value), w = num($("#cWater").value);
+  $("#cRatio").value = (d && w) ? fmtRatioNum(w/d) : "";
+}
+// dose+ratio -> water field
+function waterFromRatio(){
+  const d = num($("#cDose").value), x = parseRatio($("#cRatio").value);
+  if(d && x) $("#cWater").value = Math.round(d * x);
+}
+// changing the dose keeps your ratio (scales the water); if no ratio is set, derive it
+function onDoseInput(){
+  if(parseRatio($("#cRatio").value) != null) waterFromRatio();
+  else ratioFromDoseWater();
+}
+
+function openCoffeeLog(log){
+  editingLog = log || null;
+  const d = S.defaults.coffee || {};
+  $("#cTitle").textContent = log ? "Edit coffee" : "New coffee";
+  const beanSel = log ? (log.beanId || (log.beanName ? "__free" : "")) : (d.beanId && S.coffeeLib.some(e=>e.id===d.beanId) ? d.beanId : "");
+  fillBeanSelect(beanSel);
+  $("#cBeanFree").value = log ? (log.beanName||"") : "";
+  methodChipsInit();
+  setChips("#cMethod", log ? (log.method||"") : (d.method||""));
+  fillGrinderSelect(log ? (log.grinderId||"") : (d.grinderId||""));
+  $("#cGrind").value = log ? (log.grindSetting||"") : (d.grindSetting||"");
+  $("#cDose").value  = log ? (log.dose??"")  : (d.dose??"");
+  $("#cWater").value = log ? (log.water??"") : (d.water??"");
+  $("#cTemp").value  = log ? (log.temp??"")  : (d.temp??"");
+  $("#cTime").value  = log && log.timeSec!=null ? fmtTime(log.timeSec) : "";
+  $("#cNotes").value = log ? (log.notes||"") : "";
+  draftRating = log ? (log.rating||0) : 0;
+  renderPips("#cPips");
+  ratioFromDoseWater();
+  $$(".c-unit").forEach(el=>el.textContent = unitLabel());
+  $("#cDelete").style.display = log ? "" : "none";
+  openSheet("#coffeeSheet");
+}
+
+async function saveCoffeeLog(){
+  const beanSel = $("#cBean").value;
+  const beanId = (beanSel && beanSel!=="__free" && beanSel!=="__add") ? beanSel : null;
+  const beanName = beanSel==="__free" ? $("#cBeanFree").value.trim()
+                  : (beanId ? (libName("coffee", beanId)||"") : "");
+  const rec = {
+    id: editingLog ? editingLog.id : uid("clog"),
+    createdAt: editingLog ? editingLog.createdAt : now(),
+    updatedAt: now(),
+    date: editingLog ? editingLog.date : now(),
+    beanId, beanName,
+    beanNotes: editingLog ? (editingLog.beanNotes||"") : "",
+    method: chipValue("#cMethod"),
+    grinderId: $("#cGrinder").value && !$("#cGrinder").value.startsWith("__") ? $("#cGrinder").value : null,
+    grinderName: "",
+    grindSetting: $("#cGrind").value.trim(),
+    dose: num($("#cDose").value),
+    water: num($("#cWater").value),
+    temp: num($("#cTemp").value),
+    tempUnit: unitLabel(),
+    timeSec: parseTime($("#cTime").value),
+    rating: draftRating,
+    notes: $("#cNotes").value.trim()
+  };
+  rec.grinderName = rec.grinderId ? (grinderName(rec.grinderId)||"") : "";
+  const hasContent = rec.beanId || rec.beanName || rec.dose!=null || rec.water!=null || rec.temp!=null || rec.timeSec!=null || rec.notes || rec.rating || rec.method;
+  if(!hasContent){ toast("Add at least one detail first"); return; }
+  await dbPut("coffee_logs", rec);
+  const i = S.coffeeLogs.findIndex(x=>x.id===rec.id);
+  if(i>-1) S.coffeeLogs[i] = rec; else S.coffeeLogs.push(rec);
+  S.defaults.coffee = { beanId:rec.beanId, method:rec.method, grinderId:rec.grinderId,
+                        grindSetting:rec.grindSetting, dose:rec.dose, water:rec.water, temp:rec.temp };
+  await setMeta("defaults", S.defaults);
+  await markDirty();
+  queueUpsert("coffee_logs", rec.id);
+  setNav("coffee","logs");
+  closeSheet(); toast(editingLog ? "Brew updated" : "Brew saved");
+  editingLog = null;
+}
+
+async function deleteCoffeeLog(){
+  if(!editingLog) return;
+  if(!(await uiConfirm({title:"Delete this brew?", message:"This can't be undone.", confirmLabel:"Delete", danger:true}))) return;
+  const cDelId = editingLog.id;
+  await dbDel("coffee_logs", cDelId);
+  S.coffeeLogs = S.coffeeLogs.filter(x=>x.id!==cDelId);
+  await markDirty();
+  queueDelete("coffee_logs", cDelId);
+  editingLog = null; closeSheet(); render(); toast("Brew deleted");
+}
+
+/* ============================== matcha log sheet ============================== */
+function fillMatchaSelect(selectedId){
+  const sel = $("#mMatcha");
+  const opts = [`<option value="">— choose a matcha —</option>`]
+    .concat(S.matchaLib.map(e=>`<option value="${esc(e.id)}">${esc(e.brand||"Untitled")}</option>`))
+    .concat([`<option value="__free">✎ Type a name instead</option>`]);
+  sel.innerHTML = opts.join("");
+  sel.value = selectedId || "";
+  $("#mMatchaFreeWrap").style.display = sel.value==="__free" ? "" : "none";
+}
+function updateMatchaRatio(){
+  $("#mRatio").textContent = ratioOf(num($("#mWater").value), num($("#mAmount").value)) || "—";
+  const a = num($("#mAmount").value);
+  const btn = $("#mSuggest");
+  if(a){ btn.textContent = `Suggest 1:10 base → ${Math.round(a*10)} ml`; btn.style.display=""; }
+  else { btn.textContent = ""; btn.style.display="none"; }
+}
+
+function openMatchaLog(log){
+  editingLog = log || null;
+  const d = S.defaults.matcha || {};
+  $("#mTitle").textContent = log ? "Edit matcha" : "New matcha";
+  const mid = log ? (log.matchaId || (log.matchaName ? "__free" : "")) : (d.matchaId && S.matchaLib.some(e=>e.id===d.matchaId) ? d.matchaId : "");
+  fillMatchaSelect(mid);
+  $("#mMatchaFree").value = log ? (log.matchaName||"") : "";
+  setChips("#mPrep", log ? (log.prepStyle||"") : (d.prepStyle||"latte"));
+  $("#mAmount").value = log ? (log.amount??"") : (d.amount??"");
+  $("#mWater").value  = log ? (log.water??"")  : (d.water??"");
+  $("#mTemp").value   = log ? (log.temp??"")   : (d.temp??"");
+  $("#mMilk").value   = log ? (log.milkType||"") : (d.milkType||"");
+  $("#mMilkAmt").value= log ? (log.milkAmount??"") : (d.milkAmount??"");
+  $("#mSweet").value  = log ? (log.sweetener||"") : (d.sweetener||"");
+  setChips("#mWhisk", log ? (log.whiskType||"") : (d.whiskType||""));
+  const sifted = log ? (log.sifted===true) : (d.sifted===true);
+  $("#mSifted").classList.toggle("on", sifted);
+  $("#mSifted").setAttribute("aria-checked", String(sifted));
+  $("#mNotes").value = log ? (log.notes||"") : "";
+  draftRating = log ? (log.rating||0) : 0;
+  renderPips("#mPips");
+  updateMatchaRatio();
+  $$(".c-unit").forEach(el=>el.textContent = unitLabel());
+  $("#mDelete").style.display = log ? "" : "none";
+  openSheet("#matchaSheet");
+}
+
+async function saveMatchaLog(){
+  const mSel = $("#mMatcha").value;
+  const matchaId = (mSel && mSel!=="__free") ? mSel : null;
+  const matchaName = mSel==="__free" ? $("#mMatchaFree").value.trim()
+                    : (matchaId ? (libName("matcha", matchaId)||"") : "");
+  const rec = {
+    id: editingLog ? editingLog.id : uid("mlog"),
+    createdAt: editingLog ? editingLog.createdAt : now(),
+    updatedAt: now(),
+    date: editingLog ? editingLog.date : now(),
+    matchaId, matchaName,
+    beanNotes: editingLog ? (editingLog.beanNotes||"") : "",
+    prepStyle: chipValue("#mPrep"),
+    amount: num($("#mAmount").value),
+    water: num($("#mWater").value),
+    temp: num($("#mTemp").value),
+    tempUnit: unitLabel(),
+    milkType: $("#mMilk").value.trim(),
+    milkAmount: num($("#mMilkAmt").value),
+    sweetener: $("#mSweet").value.trim(),
+    whiskType: chipValue("#mWhisk"),
+    sifted: $("#mSifted").classList.contains("on"),
+    rating: draftRating,
+    notes: $("#mNotes").value.trim()
+  };
+  const hasContent = rec.matchaId || rec.matchaName || rec.amount!=null || rec.water!=null || rec.notes || rec.rating;
+  if(!hasContent){ toast("Add at least one detail first"); return; }
+  await dbPut("matcha_logs", rec);
+  const i = S.matchaLogs.findIndex(x=>x.id===rec.id);
+  if(i>-1) S.matchaLogs[i] = rec; else S.matchaLogs.push(rec);
+  S.defaults.matcha = { matchaId:rec.matchaId, prepStyle:rec.prepStyle, amount:rec.amount, water:rec.water,
+                        temp:rec.temp, milkType:rec.milkType, milkAmount:rec.milkAmount,
+                        sweetener:rec.sweetener, whiskType:rec.whiskType, sifted:rec.sifted };
+  await setMeta("defaults", S.defaults);
+  await markDirty();
+  queueUpsert("matcha_logs", rec.id);
+  setNav("matcha","logs");
+  closeSheet(); toast(editingLog ? "Matcha updated" : "Matcha saved");
+  editingLog = null;
+}
+
+async function deleteMatchaLog(){
+  if(!editingLog) return;
+  if(!(await uiConfirm({title:"Delete this cup?", message:"This can't be undone.", confirmLabel:"Delete", danger:true}))) return;
+  const mDelId = editingLog.id;
+  await dbDel("matcha_logs", mDelId);
+  S.matchaLogs = S.matchaLogs.filter(x=>x.id!==mDelId);
+  await markDirty();
+  queueDelete("matcha_logs", mDelId);
+  editingLog = null; closeSheet(); render(); toast("Cup deleted");
+}
+
+/* ============================== library sheet ============================== */
+function openLib(entry){
+  editingLib = entry || null;
+  draftPhoto = undefined; // unchanged
+  const drink = nav.drink;
+  const isCoffee = drink==="coffee";
+  $("#lTitle").textContent = entry ? (isCoffee?"Edit bag":"Edit tin") : (isCoffee?"Add bag":"Add tin");
+  $("#lNameLabel").textContent = isCoffee ? "Bean / roaster" : "Brand";
+  $("#lName").placeholder = isCoffee ? "e.g. Ethiopia Guji — Roaster Co." : "e.g. Ippodo Ummon";
+  $("#lGradeWrap").style.display = isCoffee ? "none" : "";
+  $("#lRoastWrap").style.display = isCoffee ? "" : "none";
+  $("#lSizeLabel").textContent = isCoffee ? "Bag size (g)" : "Tin size (g)";
+  $("#lName").value   = entry ? ((isCoffee?entry.name:entry.brand)||"") : "";
+  $("#lGrade").value  = entry ? (entry.grade||"") : "";
+  $("#lOrigin").value = entry ? (entry.origin||"") : "";
+  $("#lRoast").value  = entry ? (entry.roastNotes||"") : "";
+  $("#lPrice").value  = entry ? (entry.price??"") : "";
+  $("#lSize").value   = entry ? (entry.size??"") : "";
+  $("#lNotes").value  = entry ? (entry.notes||"") : "";
+  const pv = $("#lPhotoPv");
+  const url = entry && entry.photo ? freshObjURL(entry.photo) : null;
+  pv.innerHTML = url ? `<img src="${url}" alt="">` : "📷";
+  $("#lPhotoRemove").style.display = (entry && entry.photo) ? "" : "none";
+  $("#lDelete").style.display = entry ? "" : "none";
+  openSheet("#libSheet");
+}
+
+async function saveLib(){
+  const isCoffee = nav.drink==="coffee";
+  const store = isCoffee ? "coffee_library" : "matcha_library";
+  const rec = {
+    id: editingLib ? editingLib.id : uid(isCoffee?"cbag":"mtin"),
+    createdAt: editingLib ? editingLib.createdAt : now(),
+    updatedAt: now(),
+    origin: $("#lOrigin").value.trim(),
+    price: num($("#lPrice").value),
+    size: num($("#lSize").value),
+    notes: $("#lNotes").value.trim(),
+    photo: draftPhoto===undefined ? (editingLib ? editingLib.photo||null : null) : draftPhoto,
+    photoKey: draftPhoto===undefined ? (editingLib ? editingLib.photoKey||null : null) : null
+  };
+  if(isCoffee){ rec.name = $("#lName").value.trim(); rec.roastNotes = $("#lRoast").value.trim(); }
+  else { rec.brand = $("#lName").value.trim(); rec.grade = $("#lGrade").value.trim(); }
+  const nm = isCoffee ? rec.name : rec.brand;
+  if(!nm && rec.price==null && !rec.notes && !rec.photo){ toast("Give it at least a name"); return; }
+  await dbPut(store, rec);
+  const arr = isCoffee ? S.coffeeLib : S.matchaLib;
+  const i = arr.findIndex(x=>x.id===rec.id);
+  if(i>-1) arr[i] = rec; else arr.push(rec);
+  await markDirty();
+  queueUpsert(store, rec.id);
+  closeSheet(); render(); toast(editingLib ? "Saved" : (isCoffee?"Bag added":"Tin added"));
+  editingLib = null;
+}
+
+async function deleteLib(){
+  if(!editingLib) return;
+  const isCoffee = nav.drink==="coffee";
+  if(!(await uiConfirm({title:`Delete this ${isCoffee?"bag":"tin"}?`, message:"Logs that used it keep their name.", confirmLabel:"Delete", danger:true}))) return;
+  const lDelId = editingLib.id, lDelStore = isCoffee?"coffee_library":"matcha_library";
+  await dbDel(lDelStore, lDelId);
+  if(isCoffee) S.coffeeLib = S.coffeeLib.filter(x=>x.id!==lDelId);
+  else S.matchaLib = S.matchaLib.filter(x=>x.id!==lDelId);
+  await markDirty();
+  queueDelete(lDelStore, lDelId);
+  editingLib = null; closeSheet(); render(); toast("Deleted");
+}
+
+/* ============================== grinders ============================== */
+async function addGrinder(name){
+  name = (name||"").trim();
+  if(!name) return null;
+  const g = { id: uid("grd"), name, createdAt: now(), updatedAt: now() };
+  await dbPut("grinders", g);
+  S.grinders.push(g);
+  await markDirty();
+  queueUpsert("grinders", g.id);
+  return g;
+}
+function renderGrinderList(){
+  const el = $("#grinderList");
+  const rows = S.grinders.map(g=>`<div class="grinder-row"><span>${esc(g.name)}</span>
+    <button class="del" data-g="${esc(g.id)}">Remove</button></div>`).join("");
+  el.innerHTML = rows + `<button class="set-row" id="grinderAdd"><div style="color:var(--accent); font-weight:600;">＋ Add grinder</div></button>`;
+  el.querySelectorAll(".del").forEach(b=>{
+    b.onclick = async ()=>{
+      if(!(await uiConfirm({title:"Remove this grinder?", message:"Past logs keep its name.", confirmLabel:"Remove", danger:true}))) return;
+      await dbDel("grinders", b.dataset.g);
+      S.grinders = S.grinders.filter(x=>x.id!==b.dataset.g);
+      await markDirty(); queueDelete("grinders", b.dataset.g); renderGrinderList();
+    };
+  });
+  $("#grinderAdd").onclick = async ()=>{
+    const name = await uiPrompt({title:"Add grinder", placeholder:"e.g. Comandante C40", confirmLabel:"Add"});
+    if(name){ await addGrinder(name); renderGrinderList(); toast("Grinder added"); }
+  };
+}
+
+/* ============================== export / import ============================== */
+async function buildExport(includePhotos){
+  const packLib = async (arr, isCoffee)=>{
+    const out = [];
+    for(const e of arr){
+      const copy = Object.assign({}, e);
+      if(copy.photo && includePhotos){
+        try{ copy.photo = await blobToDataURL(copy.photo); }catch(err){ copy.photo = null; }
+      } else copy.photo = null;
+      out.push(copy);
+    }
+    return out;
+  };
+  return {
+    app:"brewlog", schemaVersion:APP_SCHEMA, exportedAt: now(),
+    settings:S.settings, defaults:S.defaults,
+    grinders:S.grinders,
+    coffee_library: await packLib(S.coffeeLib, true),
+    matcha_library: await packLib(S.matchaLib, false),
+    coffee_logs:S.coffeeLogs, matcha_logs:S.matchaLogs
+  };
+}
+async function exportData(){
+  try{
+    const data = await buildExport(true);
+    const text = JSON.stringify(data);
+    const stamp = new Date().toISOString().slice(0,10);
+    const blob = new Blob([text], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `brewlog-backup-${stamp}.json`;
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 800);
+    S.backup.lastExportAt = now(); S.backup.dirty = 0;
+    await setMeta("backup", S.backup);
+    renderNudge();
+    toast("Backup file created");
+  }catch(e){ toast("Export failed — try again"); }
+}
+async function copyBackup(){
+  try{
+    const data = await buildExport(false); // clipboard version skips photos to stay pasteable
+    const text = JSON.stringify(data);
+    await navigator.clipboard.writeText(text);
+    toast("Backup copied (without photos)");
+  }catch(e){
+    $("#pasteWrap").style.display = "block";
+    try{ $("#pasteBox").value = JSON.stringify(await buildExport(false)); $("#pasteBox").select(); }catch(_){}
+    toast("Copy it from the box above");
+  }
+}
+function newer(a, b){ // is a newer than b
+  return new Date(a.updatedAt||a.createdAt||0) > new Date(b.updatedAt||b.createdAt||0);
+}
+async function mergeInto(store, arrName, incoming, restorePhotos){
+  const arr = S[arrName];
+  let added = 0, updated = 0;
+  for(const raw of incoming||[]){
+    if(!raw || !raw.id) continue;
+    const rec = Object.assign({}, raw);
+    if(restorePhotos && typeof rec.photo === "string" && rec.photo.startsWith("data:")){
+      rec.photo = dataURLToBlob(rec.photo);
+    } else if(typeof rec.photo === "string"){ rec.photo = null; }
+    const i = arr.findIndex(x=>x.id===rec.id);
+    if(i===-1){ await dbPut(store, rec); arr.push(rec); added++; queueUpsert(store, rec.id); }
+    else if(newer(rec, arr[i])){
+      if(rec.photo==null && arr[i].photo) rec.photo = arr[i].photo; // never lose a local photo to a photoless import
+      await dbPut(store, rec); arr[i] = rec; updated++; queueUpsert(store, rec.id);
+    }
+  }
+  return added + updated;
+}
+async function importPayload(obj){
+  if(!obj){ toast("That doesn't look like a Brew Log backup"); return; }
+  let n = 0;
+  if(Array.isArray(obj.brews)){ // legacy v1 localStorage format
+    for(const b of obj.brews){
+      if(!b || !b.id) continue;
+      if(b.type==="matcha"){
+        const rec = { id:"mlog_legacy_"+b.id, createdAt:b.date||now(), updatedAt:b.date||now(), date:b.date||now(),
+          matchaId:null, matchaName:b.bean||"", beanNotes:b.beanNotes||"", prepStyle:"", amount:b.dose??null,
+          water:b.water??null, temp:b.temp??null, tempUnit:b.tempUnit||"°C", milkType:"", milkAmount:null,
+          sweetener:"", whiskType:"", sifted:null, rating:b.rating||0, notes:b.notes||"" };
+        if(!S.matchaLogs.some(x=>x.id===rec.id)){ await dbPut("matcha_logs", rec); S.matchaLogs.push(rec); n++; queueUpsert("matcha_logs", rec.id); }
+      } else {
+        const rec = { id:"clog_legacy_"+b.id, createdAt:b.date||now(), updatedAt:b.date||now(), date:b.date||now(),
+          beanId:null, beanName:b.bean||"", beanNotes:b.beanNotes||"", method:"", grinderId:null, grinderName:"",
+          grindSetting:b.grind||"", dose:b.dose??null, water:b.water??null, temp:b.temp??null,
+          tempUnit:b.tempUnit||"°C", timeSec:b.timeSec??null, rating:b.rating||0, notes:b.notes||"" };
+        if(!S.coffeeLogs.some(x=>x.id===rec.id)){ await dbPut("coffee_logs", rec); S.coffeeLogs.push(rec); n++; queueUpsert("coffee_logs", rec.id); }
+      }
+    }
+  } else if(obj.app==="brewlog" || obj.schemaVersion){
+    n += await mergeInto("coffee_library","coffeeLib", obj.coffee_library, true);
+    n += await mergeInto("matcha_library","matchaLib", obj.matcha_library, true);
+    n += await mergeInto("coffee_logs","coffeeLogs", obj.coffee_logs, false);
+    n += await mergeInto("matcha_logs","matchaLogs", obj.matcha_logs, false);
+    n += await mergeInto("grinders","grinders", obj.grinders, false);
+  } else { toast("That doesn't look like a Brew Log backup"); return; }
+  await markDirty();
+  render(); updateCounts();
+  toast(n ? `Restored ${n} item${n>1?"s":""}` : "Already up to date");
+}
+
+/* ============================== cloud sync (Phase 2) ============================== */
+/* Local IndexedDB stays the source of truth. Cloud = durable copy.
+   Every save/delete queues a change; flushes run in the background and
+   never block or slow local logging. Offline changes stay queued. */
+const CLOUD_TABLES = {
+  coffee_library:"coffeeLib", matcha_library:"matchaLib",
+  coffee_logs:"coffeeLogs", matcha_logs:"matchaLogs", grinders:"grinders"
+};
+const cloudEnabled = ()=> !!(S.cloud.url && S.cloud.key);
+function pendingCount(){
+  let n = 0;
+  for(const t in S.cloud.pending.upserts) n += Object.keys(S.cloud.pending.upserts[t]).length;
+  for(const t in S.cloud.pending.deletes) n += Object.keys(S.cloud.pending.deletes[t]).length;
+  return n;
+}
+let saveCloudT = null;
+function saveCloudMeta(){ // debounced persist of queue/config
+  clearTimeout(saveCloudT);
+  saveCloudT = setTimeout(()=>{ setMeta("cloud", S.cloud).catch(()=>{}); }, 300);
+}
+function queueUpsert(table, id){
+  if(!cloudEnabled() || !CLOUD_TABLES[table] || !id) return;
+  (S.cloud.pending.upserts[table] = S.cloud.pending.upserts[table] || {})[id] = 1;
+  if(S.cloud.pending.deletes[table]) delete S.cloud.pending.deletes[table][id];
+  saveCloudMeta(); scheduleFlush();
+}
+function queueDelete(table, id){
+  if(!cloudEnabled() || !CLOUD_TABLES[table] || !id) return;
+  (S.cloud.pending.deletes[table] = S.cloud.pending.deletes[table] || {})[id] = 1;
+  if(S.cloud.pending.upserts[table]) delete S.cloud.pending.upserts[table][id];
+  saveCloudMeta(); scheduleFlush();
+}
+
+function cloudFetch(path, opts){
+  opts = opts || {};
+  const ctl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+  const t = ctl ? setTimeout(()=>ctl.abort(), 25000) : null;
+  const headers = Object.assign({ "Authorization": "Bearer " + S.cloud.key }, opts.headers || {});
+  return fetch(S.cloud.url.replace(/\/+$/,"") + path,
+      Object.assign({}, opts, { headers, signal: ctl ? ctl.signal : undefined }))
+    .finally(()=>{ if(t) clearTimeout(t); });
+}
+
+/* outbound serialization: blobs never leave via /push; booleans -> 0/1 */
+function serializeRow(table, rec){
+  const row = {};
+  for(const k in rec){
+    const v = rec[k];
+    if(k === "photo") continue;
+    if(typeof v === "boolean"){ row[k] = v ? 1 : 0; continue; }
+    if(v === undefined){ row[k] = null; continue; }
+    if(v === null || typeof v === "number" || typeof v === "string"){ row[k] = v; continue; }
+  }
+  return row;
+}
+function reviveRow(table, row){
+  const rec = Object.assign({}, row);
+  delete rec.deleted;
+  if(table === "matcha_logs") rec.sifted = row.sifted==null ? null : !!row.sifted;
+  return rec;
+}
+
+let flushT = null, flushing = false;
+function scheduleFlush(){ clearTimeout(flushT); flushT = setTimeout(()=>{ flushSync(); }, 1500); }
+
+async function uploadPhotoIfNeeded(table, rec){
+  if(table !== "coffee_library" && table !== "matcha_library") return;
+  if(!(rec.photo instanceof Blob) || rec.photoKey) return;
+  const res = await cloudFetch("/photo?id=" + encodeURIComponent(rec.id), {
+    method:"POST", body: rec.photo, headers: { "Content-Type":"image/jpeg" }
+  });
+  if(!res.ok) throw new Error("photo upload failed");
+  const j = await res.json();
+  rec.photoKey = j.key;
+  rec.updatedAt = now(); // ensure the keyed row wins last-write-wins in the cloud
+  await dbPut(table, rec); // persist the key locally
+}
+
+async function flushSync(){
+  if(!cloudEnabled() || flushing || !pendingCount()) { renderCloudPanel(); return; }
+  if(typeof navigator !== "undefined" && navigator.onLine === false) { renderCloudPanel(); return; }
+  flushing = true; renderCloudPanel();
+  // snapshot the queue; anything queued during the flush survives for the next one
+  const snap = JSON.parse(JSON.stringify(S.cloud.pending));
+  try{
+    const payload = { upserts:{}, deletes:{} };
+    for(const [table, ids] of Object.entries(snap.upserts)){
+      const arr = S[CLOUD_TABLES[table]];
+      const rows = [];
+      for(const id of Object.keys(ids)){
+        const rec = arr.find(x=>x.id===id);
+        if(!rec) continue;               // deleted since queuing
+        await uploadPhotoIfNeeded(table, rec);
+        rows.push(serializeRow(table, rec));
+      }
+      if(rows.length) payload.upserts[table] = rows;
+    }
+    for(const [table, ids] of Object.entries(snap.deletes)){
+      const list = Object.keys(ids);
+      if(list.length) payload.deletes[table] = list;
+    }
+    const res = await cloudFetch("/push", {
+      method:"POST", body: JSON.stringify(payload),
+      headers: { "Content-Type":"application/json" }
+    });
+    if(!res.ok) throw new Error("push failed " + res.status);
+    // clear exactly what we sent
+    for(const [table, ids] of Object.entries(snap.upserts))
+      for(const id of Object.keys(ids)) if(S.cloud.pending.upserts[table]) delete S.cloud.pending.upserts[table][id];
+    for(const [table, ids] of Object.entries(snap.deletes))
+      for(const id of Object.keys(ids)) if(S.cloud.pending.deletes[table]) delete S.cloud.pending.deletes[table][id];
+    S.cloud.lastSyncAt = now();
+    saveCloudMeta();
+  }catch(e){ /* stays queued; retried on next save, reconnect, or interval */ }
+  flushing = false;
+  renderCloudPanel(); renderNudge();
+}
+
+function queueEverything(){
+  for(const [table, arrName] of Object.entries(CLOUD_TABLES))
+    for(const rec of S[arrName])
+      (S.cloud.pending.upserts[table] = S.cloud.pending.upserts[table] || {})[rec.id] = 1;
+  saveCloudMeta();
+}
+
+async function connectCloud(url, key){
+  url = (url||"").trim().replace(/\/+$/,"");
+  key = (key||"").trim();
+  if(!/^https:\/\//.test(url)){ toast("Worker URL must start with https://"); return false; }
+  if(key.length < 32){ toast("That key looks too short"); return false; }
+  S.cloud.url = url; S.cloud.key = key;
+  try{
+    const res = await cloudFetch("/pull?since=" + encodeURIComponent(now()));
+    if(res.status === 401){ S.cloud.url=""; S.cloud.key=""; toast("Cloud said: wrong key"); return false; }
+    if(!res.ok) throw new Error("status " + res.status);
+  }catch(e){
+    S.cloud.url=""; S.cloud.key="";
+    toast("Couldn't reach the Worker — check the URL"); return false;
+  }
+  await setMeta("cloud", S.cloud);
+  queueEverything();            // seed the cloud with everything already here
+  flushSync();
+  toast("Cloud connected — backing up");
+  return true;
+}
+
+async function disconnectCloud(){
+  S.cloud = { url:"", key:"", lastSyncAt:null, pending:{ upserts:{}, deletes:{} } };
+  await setMeta("cloud", S.cloud);
+  renderCloudPanel();
+  toast("Cloud disconnected — data stays on the phone and in the cloud");
+}
+
+async function restoreFromCloud(){
+  if(!cloudEnabled()) return;
+  let data;
+  try{
+    const res = await cloudFetch("/pull");
+    if(!res.ok) throw new Error("status " + res.status);
+    data = await res.json();
+  }catch(e){ toast("Restore failed — couldn't reach the cloud"); return; }
+  let applied = 0;
+  const photoFetches = [];
+  for(const [table, arrName] of Object.entries(CLOUD_TABLES)){
+    const rows = (data.tables && data.tables[table]) || [];
+    const arr = S[arrName];
+    for(const row of rows){
+      if(!row || !row.id) continue;
+      const i = arr.findIndex(x=>x.id===row.id);
+      const localNewer = i>-1 && new Date(arr[i].updatedAt||arr[i].createdAt||0) >= new Date(row.updatedAt||0);
+      if(localNewer) continue;
+      if(row.deleted){
+        if(i>-1){ await dbDel(table, row.id); arr.splice(i,1); applied++; }
+        continue;
+      }
+      const rec = reviveRow(table, row);
+      if(i>-1 && arr[i].photo && !rec.photo) rec.photo = arr[i].photo; // keep local blob
+      await dbPut(table, rec);
+      if(i>-1) arr[i] = rec; else arr.push(rec);
+      applied++;
+      if((table==="coffee_library"||table==="matcha_library") && rec.photoKey && !rec.photo)
+        photoFetches.push({ table, id: rec.id });
+    }
+  }
+  render(); updateCounts(); renderCloudPanel();
+  toast(applied ? `Restored ${applied} item${applied>1?"s":""} from cloud` : "Already up to date");
+  // lazy photo hydration in the background
+  for(const p of photoFetches){
+    try{
+      const res = await cloudFetch("/photo/" + encodeURIComponent(p.id));
+      if(!res.ok) continue;
+      const blob = await res.blob();
+      const arr = S[CLOUD_TABLES[p.table]];
+      const rec = arr.find(x=>x.id===p.id);
+      if(rec){ rec.photo = blob; await dbPut(p.table, rec); }
+    }catch(e){ /* photo can hydrate next time */ }
+  }
+  if(photoFetches.length) render();
+}
+
+function renderCloudPanel(){
+  const el = $("#cloudPanel");
+  if(!el) return;
+  if(!cloudEnabled()){
+    el.innerHTML = `
+      <div class="field" style="margin:12px 0 10px;">
+        <label>Worker URL</label>
+        <input type="text" id="cloudUrl" placeholder="https://brewlog-sync.you.workers.dev" autocomplete="off" autocapitalize="off" />
+      </div>
+      <div class="field">
+        <label>Secret key</label>
+        <input type="password" id="cloudKey" placeholder="paste your sync key" autocomplete="off" />
+      </div>
+      <button class="btn-primary" id="cloudConnect" style="width:100%;">Connect cloud backup</button>
+      <div class="set-note" style="padding-top:10px;">Stored on this phone only — never in the repo.</div>`;
+    $("#cloudConnect").onclick = async ()=>{
+      const ok = await connectCloud($("#cloudUrl").value, $("#cloudKey").value);
+      if(ok) renderCloudPanel();
+    };
+  } else {
+    const n = pendingCount();
+    const status = flushing ? "Syncing…"
+      : n ? `${n} change${n>1?"s":""} waiting to sync`
+      : S.cloud.lastSyncAt ? "Last synced " + new Date(S.cloud.lastSyncAt).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})
+      : "Connected — not synced yet";
+    el.innerHTML = `
+      <div class="set-group" style="margin-top:12px;">
+        <div class="set-row"><div><div>Cloud backup on</div><div class="desc" id="cloudStatus">${esc(status)}</div></div></div>
+        <button class="set-row" id="cloudSyncNow"><div>Sync now</div><span class="chev">›</span></button>
+        <button class="set-row" id="cloudRestore"><div><div>Restore from cloud</div><div class="desc">Pulls everything back — merges, never wipes</div></div><span class="chev">›</span></button>
+        <button class="set-row" id="cloudDisconnect" style="color:var(--danger)"><div>Disconnect</div><span class="chev">›</span></button>
+      </div>`;
+    $("#cloudSyncNow").onclick = ()=>{ scheduleFlush(); flushSync(); };
+    $("#cloudRestore").onclick = restoreFromCloud;
+    $("#cloudDisconnect").onclick = async ()=>{
+      if(await uiConfirm({title:"Disconnect cloud backup?", message:"Your data stays on the phone and in the cloud; new changes just stop syncing.", confirmLabel:"Disconnect", danger:true})) disconnectCloud();
+    };
+  }
+}
+
+/* ============================== settings ============================== */
+function updateCounts(){
+  const total = S.coffeeLogs.length + S.matchaLogs.length;
+  $("#countLine").textContent =
+    `${total} log${total===1?"":"s"} · ${S.coffeeLib.length} bag${S.coffeeLib.length===1?"":"s"} · ${S.matchaLib.length} tin${S.matchaLib.length===1?"":"s"} — stored on this phone`;
+}
+function openSettings(){
+  applyTheme();
+  $$("#unitToggle button").forEach(b=>b.classList.toggle("on", b.dataset.v===S.settings.tempUnit));
+  renderGrinderList();
+  updateCounts();
+  renderCloudPanel();
+  $("#pasteWrap").style.display = "none";
+  openSheet("#setSheet");
+}
+
+/* ============================== wiring ============================== */
+function wire(){
+  $("#tabCoffee").onclick = ()=>setNav("coffee");
+  $("#tabMatcha").onclick = ()=>setNav("matcha");
+  $("#subLogs").onclick = ()=>setNav(null,"logs");
+  $("#subLibrary").onclick = ()=>setNav(null,"library");
+  $("#addBtn").onclick = ()=>{
+    if(nav.tab==="library") openLib(null);
+    else nav.drink==="coffee" ? openCoffeeLog(null) : openMatchaLog(null);
+  };
+  $("#scrim").onclick = closeSheet;
+  $$("[data-close]").forEach(b=>b.onclick = closeSheet);
+
+  // coffee sheet
+  $("#cSave").onclick = saveCoffeeLog;
+  $("#cSaveTop").onclick = saveCoffeeLog;
+  $("#cDelete").onclick = deleteCoffeeLog;
+  $("#cRateClear").onclick = ()=>{ draftRating = 0; renderPips("#cPips"); };
+  $("#cDose").addEventListener("input", onDoseInput);
+  $("#cWater").addEventListener("input", ratioFromDoseWater);
+  $("#cRatio").addEventListener("input", waterFromRatio);
+  $("#cBean").addEventListener("change", async ()=>{
+    $("#cBeanFreeWrap").style.display = $("#cBean").value==="__free" ? "" : "none";
+  });
+  $("#cGrinder").addEventListener("change", async ()=>{
+    if($("#cGrinder").value==="__add"){
+      const name = await uiPrompt({title:"Add grinder", placeholder:"e.g. Comandante C40", confirmLabel:"Add"});
+      const g = name ? await addGrinder(name) : null;
+      fillGrinderSelect(g ? g.id : "");
+      if(g) toast("Grinder added");
+    }
+  });
+
+  // matcha sheet
+  $("#mSave").onclick = saveMatchaLog;
+  $("#mSaveTop").onclick = saveMatchaLog;
+  $("#mDelete").onclick = deleteMatchaLog;
+  $("#mRateClear").onclick = ()=>{ draftRating = 0; renderPips("#mPips"); };
+  $("#mAmount").addEventListener("input", updateMatchaRatio);
+  $("#mWater").addEventListener("input", updateMatchaRatio);
+  $("#mSuggest").onclick = ()=>{
+    const a = num($("#mAmount").value);
+    if(a){ $("#mWater").value = Math.round(a*10); updateMatchaRatio(); }
+  };
+  $("#mMatcha").addEventListener("change", ()=>{
+    $("#mMatchaFreeWrap").style.display = $("#mMatcha").value==="__free" ? "" : "none";
+  });
+  wireChips("#mPrep", false);
+  wireChips("#mWhisk", true);
+  $("#mSifted").onclick = ()=>{
+    const on = !$("#mSifted").classList.contains("on");
+    $("#mSifted").classList.toggle("on", on);
+    $("#mSifted").setAttribute("aria-checked", String(on));
+  };
+
+  // library sheet
+  $("#lSave").onclick = saveLib;
+  $("#lSaveTop").onclick = saveLib;
+  $("#lDelete").onclick = deleteLib;
+  $("#lPhotoPick").onclick = ()=>$("#lPhotoInput").click();
+  $("#lPhotoInput").onchange = async (e)=>{
+    const f = e.target.files[0]; e.target.value = "";
+    if(!f) return;
+    try{
+      const blob = await downscalePhoto(f);
+      draftPhoto = blob;
+      const url = freshObjURL(blob);
+      $("#lPhotoPv").innerHTML = url ? `<img src="${url}" alt="">` : "📷";
+      $("#lPhotoRemove").style.display = "";
+    }catch(err){ toast("Couldn't read that photo"); }
+  };
+  $("#lPhotoRemove").onclick = ()=>{
+    draftPhoto = null;
+    $("#lPhotoPv").innerHTML = "📷";
+    $("#lPhotoRemove").style.display = "none";
+  };
+
+  // settings
+  $("#settingsBtn").onclick = openSettings;
+  $$("#themeToggle button").forEach(b=>b.onclick = async ()=>{
+    S.settings.theme = b.dataset.v;
+    await setMeta("settings", S.settings);
+    applyTheme();
+  });
+  $$("#unitToggle button").forEach(b=>b.onclick = async ()=>{
+    S.settings.tempUnit = b.dataset.v;
+    await setMeta("settings", S.settings);
+    $$("#unitToggle button").forEach(x=>x.classList.toggle("on", x===b));
+    $$(".c-unit").forEach(el=>el.textContent = unitLabel());
+    render();
+  });
+  $("#exportFile").onclick = exportData;
+  $("#copyBackup").onclick = copyBackup;
+  $("#importFile").onclick = ()=>$("#fileInput").click();
+  $("#fileInput").onchange = (e)=>{
+    const f = e.target.files[0]; e.target.value = "";
+    if(!f) return;
+    const r = new FileReader();
+    r.onload = async ()=>{ try{ await importPayload(JSON.parse(r.result)); }catch(err){ toast("Couldn't read that file"); } };
+    r.readAsText(f);
+  };
+  $("#pasteRestore").onclick = ()=>{
+    const w = $("#pasteWrap");
+    w.style.display = w.style.display==="block" ? "none" : "block";
+    $("#pasteBox").value = "";
+  };
+  $("#pasteConfirm").onclick = async ()=>{
+    try{ await importPayload(JSON.parse($("#pasteBox").value)); $("#pasteWrap").style.display="none"; }
+    catch(e){ toast("That isn't valid backup text"); }
+  };
+  $("#wipe").onclick = async ()=>{
+    if(!(await uiConfirm({title:"Delete everything on this phone?", message:"Every log, bag, tin, and grinder. Your cloud copy is NOT touched — use Restore from cloud to get it back.", confirmLabel:"Delete all", danger:true}))) return;
+    for(const s of ["coffee_library","matcha_library","coffee_logs","matcha_logs","grinders"]) await dbClear(s);
+    S.coffeeLib=[]; S.matchaLib=[]; S.coffeeLogs=[]; S.matchaLogs=[]; S.grinders=[];
+    S.backup = { lastExportAt:null, dirty:0, snoozeUntil:0 };
+    await setMeta("backup", S.backup);
+    S.cloud.pending = { upserts:{}, deletes:{} };
+    await setMeta("cloud", S.cloud);
+    render(); updateCounts(); renderCloudPanel(); toast("Everything deleted from this phone");
+  };
+}
+
+/* ============================== boot ============================== */
+async function boot(){
+  try{
+    await openDB();
+    await migrateLegacy();
+    await loadAll();
+  }catch(e){
+    // IndexedDB unavailable (private mode edge cases). App still renders; saving will fail loudly.
+    console.error(e);
+    toast("Storage unavailable — logs won't be saved");
+  }
+  applyTheme();
+  wire();
+  setNav("coffee","logs");
+
+  if(typeof window !== "undefined"){
+    window.addEventListener("online", ()=>{ if(pendingCount()) flushSync(); });
+    setInterval(()=>{ if(pendingCount()) flushSync(); }, 60000);
+    if(cloudEnabled() && pendingCount()) scheduleFlush();
+  }
+
+  if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+    window.addEventListener("load", ()=>navigator.serviceWorker.register("service-worker.js").catch(()=>{}));
+  }
+}
+window.__brewlogReady = boot();
+// Debug handle (used by automated tests; handy in Safari's console too).
+window.__brewlogDebug = { S, flushSync, dbPut, queueUpsert, restoreFromCloud, render, downscalePhoto };
+})();
+</script>
+</body>
+</html>
