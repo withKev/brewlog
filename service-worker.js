@@ -50,24 +50,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+
   // Same-origin: cache-first, network fallback, index fallback for navigations.
-if (url.origin === self.location.origin) {
-  event.respondWith(
-    fetch(req)
-      .then((res) => {
-        // Never cache redirects
-        if (res.ok && !res.redirected) {
-          caches.open(CACHE).then((cache) => {
-            cache.put(req, res.clone());
-          });
-        }
-        return res;
-      })
-      .catch(() => {
-        if (req.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
-        return Response.error();
-      })
-  );
-}
+  if (url.origin === self.location.origin) {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          // Never cache redirects
+          if (res.ok && !res.redirected) {
+            caches.open(CACHE).then((cache) => {
+              cache.put(req, res.clone());
+            });
+          }
+          return res;
+        })
+        .catch(() => {
+          if (req.mode === 'navigate') {
+            return caches.match('/index.html');
+          }
+          return Response.error();
+        })
+    );
+  }
+});
