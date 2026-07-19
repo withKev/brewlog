@@ -1,7 +1,6 @@
 // Brew Log service worker — offline-first app shell.
 // DEPLOYMENT RULE: bump CACHE on every change so installed copies refresh.
-const CACHE = 'brewlog-v13';
-
+const CACHE = 'brewlog-v18';
 const SHELL = [
   '/',
   '/index.html',
@@ -12,13 +11,11 @@ const SHELL = [
   '/icon-512-maskable.png',
   '/favicon.png'
 ];
-
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting())
   );
 });
-
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -26,12 +23,10 @@ self.addEventListener('activate', (event) => {
     ).then(() => self.clients.claim())
   );
 });
-
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-
   // Google Fonts: cache-first, store on first fetch.
   if (url.hostname.includes('fonts.googleapis.com') || url.hostname.includes('fonts.gstatic.com')) {
     event.respondWith(
@@ -49,9 +44,8 @@ self.addEventListener('fetch', (event) => {
     );
     return;
   }
-
-
-  // Same-origin: cache-first, network fallback, index fallback for navigations.
+  // Same-origin: network-first, cache fallback for offline.
+  // Never cache redirects — that was causing the stale redirect loop on reopen.
   if (url.origin === self.location.origin) {
     event.respondWith(
       fetch(req)
