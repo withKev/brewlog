@@ -1,6 +1,6 @@
 // Brew Log service worker — offline-first app shell.
 // DEPLOYMENT RULE: bump CACHE on every change so installed copies refresh.
-const CACHE = 'brewlog-v22';
+const CACHE = 'brewlog-v24';
 const SHELL = [
   '/',
   '/index.html',
